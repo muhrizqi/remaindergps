@@ -67,7 +67,17 @@ async function importFromExcel(filePath, sheetName = null) {
   if (!sheet) {
     throw new Error(`Sheet "${sheetName}" tidak ditemukan. Sheet tersedia: ${wb.SheetNames.join(', ')}`);
   }
-  const rows = XLSX.utils.sheet_to_json(sheet, { defval: null });
+  const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: null });
+
+  // Normalisasi nama kolom: buang spasi berlebih di awal/akhir header
+  // (file Excel kadang punya header seperti "pertama diisi " dengan spasi nyasar)
+  const rows = rawRows.map((r) => {
+    const clean = {};
+    for (const key of Object.keys(r)) {
+      clean[key.trim()] = r[key];
+    }
+    return clean;
+  });
 
   let inserted = 0;
   let skipped = 0;

@@ -190,9 +190,13 @@ async function doImport() {
     document.getElementById('importStatus').textContent = '❌ ' + data.error;
     return;
   }
-  document.getElementById('importStatus').textContent =
+  document.getElementById('importStatus').innerHTML =
     `✅ Berhasil: ${data.inserted}, dilewati: ${data.skipped}` +
-    (data.errors && data.errors.length ? ` (${data.errors.length} error, cek console)` : '');
+    (data.errors && data.errors.length
+      ? `<br><span style="color:#dc2626">${data.errors.length} error:</span><br>` +
+        data.errors.slice(0, 5).map(e => `<span style="color:#dc2626;font-size:12px">• ${e}</span>`).join('<br>') +
+        (data.errors.length > 5 ? `<br><span style="font-size:12px;color:#6b7280">...dan ${data.errors.length - 5} error lainnya</span>` : '')
+      : '');
   if (data.errors && data.errors.length) console.warn('Import errors:', data.errors);
   loadAll();
 }

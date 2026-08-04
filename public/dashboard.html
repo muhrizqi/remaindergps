@@ -31,10 +31,34 @@
 </style>
 </head>
 <body>
-<header><h1>📡 Dashboard Pulsa GPS Tracker</h1></header>
+<header>
+  <h1 style="display:inline-block">📡 Dashboard Pulsa GPS Tracker</h1>
+  <button onclick="logout()" style="float:right;background:transparent;color:#fff;border:1px solid #4b5563;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px">Keluar</button>
+</header>
 <div class="container">
-  <button class="refresh" onclick="loadAll()">🔄 Refresh</button>
+  <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+    <button class="refresh" style="float:none" onclick="loadAll()">🔄 Refresh</button>
+    <button class="refresh" style="float:none;background:#7c3aed" onclick="openImport()">📥 Import Excel</button>
+    <a class="refresh" style="float:none;background:#059669;text-decoration:none;color:#fff;display:inline-block" href="/api/export-excel">📤 Download Excel</a>
+  </div>
   <div class="summary" id="summary"></div>
+
+  <div id="importModal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:50">
+    <div style="background:#fff;border-radius:12px;padding:24px;width:100%;max-width:420px">
+      <h3 style="margin-top:0">Import Data dari Excel</h3>
+      <p style="font-size:13px;color:#6b7280">Upload file Excel lama kamu (kolom: nama account, Kontak Pemilik, Device Name, imei, no hp, dst). Data dengan IMEI yang sama akan di-update, yang baru akan ditambahkan.</p>
+      <input type="file" id="excelFile" accept=".xlsx,.xls" style="margin-bottom:12px;width:100%">
+      <div id="sheetPicker" class="hidden">
+        <label style="font-size:13px;font-weight:600">Pilih Sheet:</label>
+        <select id="sheetSelect" style="width:100%;padding:8px;margin:6px 0 12px;border-radius:6px;border:1px solid #d1d5db"></select>
+      </div>
+      <div id="importStatus" style="font-size:13px;margin-bottom:12px"></div>
+      <div style="display:flex;gap:8px">
+        <button class="action" style="flex:1;padding:10px" onclick="doImport()">Import Sekarang</button>
+        <button class="action" style="flex:1;padding:10px;background:#6b7280" onclick="closeImport()">Batal</button>
+      </div>
+    </div>
+  </div>
 
   <div class="tabs">
     <div class="tab active" data-tab="all" onclick="switchTab('all')">Semua Device</div>
@@ -113,6 +137,63 @@ async function markFilled(id) {
 async function markPaid(id) {
   if (!confirm('Tandai device ini sudah bayar perpanjangan tahunan? Siklus akan direset.')) return;
   await fetch(`/api/devices/${id}/mark-paid`, { method: 'POST' });
+  loadAll();
+}
+
+async function logout() {
+  await fetch('/logout', { method: 'POST' });
+  window.location.href = '/login';
+}
+
+function openImport() {
+  document.getElementById('importModal').classList.remove('hidden');
+  document.getElementById('sheetPicker').classList.add('hidden');
+  document.getElementById('importStatus').textContent = '';
+  document.getElementById('excelFile').value = '';
+}
+function closeImport() {
+  document.getElementById('importModal').classList.add('hidden');
+}
+
+document.getElementById('excelFile').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  document.getElementById('importStatus').textContent = 'Membaca daftar sheet...';
+  const fd = new FormData();
+  fd.append('file', file);
+  const res = await fetch('/api/import-excel/sheets', { method: 'POST', body: fd });
+  const data = await res.json();
+  if (data.error) {
+    document.getElementById('importStatus').textContent = '❌ ' + data.error;
+    return;
+  }
+  const select = document.getElementById('sheetSelect');
+  select.innerHTML = data.sheetNames.map(s => `<option value="${s}">${s}</option>`).join('');
+  document.getElementById('sheetPicker').classList.remove('hidden');
+  document.getElementById('importStatus').textContent = 'Pilih sheet lalu klik "Import Sekarang".';
+});
+
+async function doImport() {
+  const fileInput = document.getElementById('excelFile');
+  const file = fileInput.files[0];
+  if (!file) { document.getElementById('importStatus').textContent = 'Pilih file dulu.'; return; }
+  const sheetName = document.getElementById('sheetSelect').value;
+
+  document.getElementById('importStatus').textContent = 'Mengimport...';
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('sheetName', sheetName || '');
+
+  const res = await fetch('/api/import-excel', { method: 'POST', body: fd });
+  const data = await res.json();
+  if (data.error) {
+    document.getElementById('importStatus').textContent = '❌ ' + data.error;
+    return;
+  }
+  document.getElementById('importStatus').textContent =
+    `✅ Berhasil: ${data.inserted}, dilewati: ${data.skipped}` +
+    (data.errors && data.errors.length ? ` (${data.errors.length} error, cek console)` : '');
+  if (data.errors && data.errors.length) console.warn('Import errors:', data.errors);
   loadAll();
 }
 

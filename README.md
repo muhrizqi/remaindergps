@@ -5,12 +5,25 @@ pembayaran perpanjangan tahunan, terintegrasi dengan WhatsApp lewat WAHA.
 
 ## Fitur
 
-- Dashboard web (list semua device, status jatuh tempo isi & billing)
+- Dashboard web (list semua device, status jatuh tempo isi & billing) — **dilindungi login**
 - Cron harian → kirim WA reminder ke nomor kamu (admin) berisi daftar device
   yang harus diisi pulsa hari ini + link "Tandai selesai" sekali klik
 - Reminder billing terpisah saat `jumlah_diisi >= 13` atau `setahun_saat` jatuh tempo
 - Opsional: auto-kirim pesan tagihan langsung ke kontak customer (`AUTO_BILL_CUSTOMER=true`)
-- Migrasi data dari Excel lama ke Postgres
+- Import data Excel lama langsung dari dashboard (upload file, pilih sheet, klik Import)
+- Download/export semua data jadi file Excel kapan saja (tombol "📤 Download Excel"), dengan header persis seperti format Excel lama kamu — cocok untuk backup rutin
+- Login admin + tombol "Lupa username/password" yang mengirim info login ke WA admin
+
+## Login
+
+Default (ubah di environment variable `ADMIN_USERNAME` / `ADMIN_PASSWORD`):
+- Username: `admin`
+- Password: `abcd1234`
+
+**Ganti password default ini sebelum deploy ke production**, karena di dalam
+dashboard ada banyak data customer. Kalau lupa, klik "Lupa username/password"
+di halaman login — sistem akan kirim username & password ke `ADMIN_WA_NUMBER`
+lewat WhatsApp.
 
 ## Setup Lokal / Development
 
@@ -47,10 +60,11 @@ Dashboard: http://localhost:3000
 6. Setelah container jalan, exec masuk container sekali untuk:
    ```bash
    npm run migrate:schema
-   npm run migrate:excel -- /path/di/dalam/container/file.xlsx
    ```
-   (upload file Excel dulu ke container, atau jalankan migrasi dari lokal
-   mengarah ke DATABASE_URL production)
+   Untuk import data Excel, **tidak perlu lagi masuk terminal** — buka
+   dashboard web, login, klik tombol **"📥 Import Excel"**, upload file
+   Excel lama kamu, pilih sheet-nya, klik Import. Data dengan IMEI yang
+   sama otomatis di-update, yang baru ditambahkan.
 
 ## Alur Harian
 

@@ -1,16 +1,5 @@
-require('dotenv').config();
 const XLSX = require('xlsx');
-const path = require('path');
 const { pool } = require('./db');
-
-// Pakai: node src/migrate-excel.js /path/ke/file.xlsx "Nama Sheet"
-const filePath = process.argv[2];
-const sheetName = process.argv[3];
-
-if (!filePath) {
-  console.error('Pakai: node src/migrate-excel.js /path/ke/file.xlsx [nama-sheet]');
-  process.exit(1);
-}
 
 function excelDateToISO(val) {
   if (!val) return null;
@@ -18,13 +7,11 @@ function excelDateToISO(val) {
     return val.toISOString().slice(0, 10);
   }
   if (typeof val === 'number') {
-    // serial number Excel
     const d = XLSX.SSF.parse_date_code(val);
     return `${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}`;
   }
   if (typeof val === 'string') {
     const s = val.trim();
-    // format M/D/YYYY
     const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
     if (m) {
       const [, mo, da, yr] = m;
@@ -44,7 +31,6 @@ function excelTimeToStr(val) {
     if (m) return `${m[1].padStart(2, '0')}:${m[2]}:${m[4] || '00'}`;
   }
   if (typeof val === 'number') {
-    // fraction of a day
     const totalSec = Math.round(val * 86400);
     const h = Math.floor(totalSec / 3600);
     const min = Math.floor((totalSec % 3600) / 60);
@@ -69,13 +55,23 @@ function parseKeterangan(val) {
   return result;
 }
 
-async function migrate() {
+/**
+ * Import data dari file Excel ke tabel devices.
+ * @param {string} filePath - path file .xlsx di disk
+ * @param {string|null} sheetName - nama sheet, default sheet pertama
+ * @returns {Promise<{inserted:number, skipped:number, errors:string[], sheetNames:string[]}>}
+ */
+async function importFromExcel(filePath, sheetName = null) {
   const wb = XLSX.readFile(filePath, { cellDates: true });
   const sheet = wb.Sheets[sheetName || wb.SheetNames[0]];
+  if (!sheet) {
+    throw new Error(`Sheet "${sheetName}" tidak ditemukan. Sheet tersedia: ${wb.SheetNames.join(', ')}`);
+  }
   const rows = XLSX.utils.sheet_to_json(sheet, { defval: null });
 
   let inserted = 0;
   let skipped = 0;
+  const errors = [];
 
   for (const r of rows) {
     const noHp = r['no hp'] || r['No HP'] || r['No Hp'];
@@ -124,13 +120,33 @@ async function migrate() {
       );
       inserted++;
     } catch (e) {
-      console.error('Gagal insert baris:', namaAccount, e.message);
+      errors.push(`${namaAccount}: ${e.message}`);
       skipped++;
     }
   }
 
-  console.log(`Selesai. Berhasil: ${inserted}, dilewati: ${skipped}`);
-  process.exit(0);
+  return { inserted, skipped, errors, sheetNames: wb.SheetNames };
 }
 
-migrate();
+module.exports = { importFromExcel };
+
+// Tetap bisa dipakai lewat CLI: node src/migrate-excel.js file.xlsx "Nama Sheet"
+if (require.main === module) {
+  require('dotenv').config();
+  const filePath = process.argv[2];
+  const sheetName = process.argv[3];
+  if (!filePath) {
+    console.error('Pakai: node src/migrate-excel.js /path/ke/file.xlsx [nama-sheet]');
+    process.exit(1);
+  }
+  importFromExcel(filePath, sheetName)
+    .then((r) => {
+      console.log(`Selesai. Berhasil: ${r.inserted}, dilewati: ${r.skipped}`);
+      if (r.errors.length) console.log('Errors:', r.errors);
+      process.exit(0);
+    })
+    .catch((e) => {
+      console.error('Migrasi gagal:', e.message);
+      process.exit(1);
+    });
+}

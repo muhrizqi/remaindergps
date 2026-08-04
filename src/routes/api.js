@@ -1,5 +1,9 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const { pool } = require('../db');
 const {
   getDevicesDueForFillToday,
@@ -8,6 +12,84 @@ const {
   markRenewalPaid,
 } = require('../deviceService');
 const { runDailyCheck } = require('../cron');
+const { importFromExcel } = require('../migrate-excel');
+
+const upload = multer({ dest: os.tmpdir() });
+
+// Cek nama-nama sheet dalam file Excel yang baru diupload (dipakai dashboard
+// buat nampilin pilihan sheet sebelum user klik "Import")
+router.post('/import-excel/sheets', upload.single('file'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'File tidak ditemukan' });
+  try {
+    const XLSX = require('xlsx');
+    const wb = XLSX.readFile(req.file.path, { bookSheets: true });
+    res.json({ sheetNames: wb.SheetNames, tempPath: req.file.path, originalName: req.file.originalname });
+  } catch (e) {
+    fs.unlink(req.file.path, () => {});
+    res.status(400).json({ error: 'Gagal membaca file: ' + e.message });
+  }
+});
+
+// Import Excel langsung dari dashboard
+router.post('/import-excel', upload.single('file'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'File tidak ditemukan' });
+  const sheetName = req.body.sheetName || null;
+  try {
+    const result = await importFromExcel(req.file.path, sheetName);
+    res.json(result);
+  } catch (e) {
+    res.status(400).json({ error: 'Import gagal: ' + e.message });
+  } finally {
+    fs.unlink(req.file.path, () => {});
+  }
+});
+
+// Export semua data device jadi file Excel (header sama seperti Excel lama)
+router.get('/export-excel', async (req, res) => {
+  const XLSX = require('xlsx');
+  const { rows } = await pool.query('SELECT * FROM devices ORDER BY nama_account');
+
+  const fmtDate = (d) => (d ? new Date(d).toLocaleDateString('en-US') : ''); // M/D/YYYY, sama seperti format asal
+  const fmtTime = (t) => (t ? String(t).slice(0, 5) : ''); // HH:MM
+  const fmtKeterangan = (k) => {
+    if (!k) return '';
+    const obj = typeof k === 'string' ? JSON.parse(k) : k;
+    return `{${Object.entries(obj).map(([key, val]) => `${key}:${val}`).join(', ')}}`;
+  };
+
+  const exportRows = rows.map((d, i) => ({
+    No: i + 1,
+    'nama account': d.nama_account || '',
+    'Kontak Pemilik': d.kontak_pemilik || '',
+    'Device Name': d.device_name || '',
+    imei: d.imei || '',
+    'no hp': d.no_hp || '',
+    'pertama diisi': fmtDate(d.pertama_diisi),
+    'Bayar 1 Tahun': fmtDate(d.bayar_1_tahun),
+    'setahun saat': fmtDate(d.setahun_saat),
+    'terakhir diisi': fmtDate(d.terakhir_diisi),
+    'jam diisi': fmtTime(d.jam_diisi),
+    'akan habis': fmtDate(d.akan_habis),
+    'jumlah diisi': d.jumlah_diisi,
+    Keterangan: fmtKeterangan(d.keterangan_json),
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(exportRows);
+  ws['!cols'] = [
+    { wch: 5 }, { wch: 22 }, { wch: 15 }, { wch: 14 }, { wch: 18 }, { wch: 15 },
+    { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 9 }, { wch: 12 },
+    { wch: 12 }, { wch: 40 },
+  ];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Data GPS Pulsa');
+
+  const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+  const filename = `data-pulsa-gps-${new Date().toISOString().slice(0, 10)}.xlsx`;
+
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(buffer);
+});
 
 // List semua device
 router.get('/devices', async (req, res) => {

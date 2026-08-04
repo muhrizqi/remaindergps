@@ -40,19 +40,36 @@ function excelTimeToStr(val) {
   return null;
 }
 
-// Parse "{u:xxx, pe:yyy, p:zzz}" -> {u:"xxx", pe:"yyy", p:"zzz"}
+// Simpan Keterangan sebagai {raw, parsed}:
+// - raw: teks aslinya persis seperti di Excel (misal "Pasang baru+1tahun")
+// - parsed: kalau formatnya kredensial "{u:xxx, pe:yyy, p:zzz}", ini berisi key:value-nya
+// Ini supaya catatan bebas (paling umum di data asli) TIDAK hilang seperti sebelumnya,
+// tapi kredensial akun tracker tetap bisa diambil terpisah kalau formatnya cocok.
 function parseKeterangan(val) {
-  if (!val || typeof val !== 'string') return {};
-  const inner = val.trim().replace(/^\{/, '').replace(/\}$/, '');
-  const result = {};
-  inner.split(',').forEach((pair) => {
-    const idx = pair.indexOf(':');
-    if (idx === -1) return;
-    const key = pair.slice(0, idx).trim();
-    const value = pair.slice(idx + 1).trim();
-    if (key) result[key] = value;
-  });
-  return result;
+  if (!val || typeof val !== 'string') return { raw: '', parsed: {} };
+  const raw = val.trim();
+
+  // Hanya dianggap "kredensial terstruktur" kalau dibungkus {} DAN semua bagian
+  // yang dipisah koma punya pola key:value
+  if (raw.startsWith('{') && raw.endsWith('}')) {
+    const inner = raw.slice(1, -1);
+    const parts = inner.split(',');
+    const parsed = {};
+    const allLookLikeKeyValue = parts.every((p) => p.includes(':'));
+    if (allLookLikeKeyValue) {
+      parts.forEach((pair) => {
+        const idx = pair.indexOf(':');
+        const key = pair.slice(0, idx).trim();
+        const value = pair.slice(idx + 1).trim();
+        if (key) parsed[key] = value;
+      });
+      if (Object.keys(parsed).length > 0) {
+        return { raw, parsed };
+      }
+    }
+  }
+
+  return { raw, parsed: {} };
 }
 
 /**

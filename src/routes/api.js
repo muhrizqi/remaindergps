@@ -54,7 +54,18 @@ router.get('/export-excel', async (req, res) => {
   const fmtKeterangan = (k) => {
     if (!k) return '';
     const obj = typeof k === 'string' ? JSON.parse(k) : k;
-    return `{${Object.entries(obj).map(([key, val]) => `${key}:${val}`).join(', ')}}`;
+    // Format baru: {raw, parsed}
+    if ('raw' in obj || 'parsed' in obj) {
+      if (obj.parsed && Object.keys(obj.parsed).length > 0) {
+        return `{${Object.entries(obj.parsed).map(([key, val]) => `${key}:${val}`).join(', ')}}`;
+      }
+      return obj.raw || '';
+    }
+    // Kompatibilitas data lama (sebelum format {raw,parsed} ada): objek flat key:value
+    if (Object.keys(obj).length > 0) {
+      return `{${Object.entries(obj).map(([key, val]) => `${key}:${val}`).join(', ')}}`;
+    }
+    return '';
   };
 
   const exportRows = rows.map((d, i) => ({
@@ -115,34 +126,69 @@ router.get('/devices/:id', async (req, res) => {
 // Buat device baru (manual, di luar import Excel)
 router.post('/devices', async (req, res) => {
   const b = req.body;
-  const { rows } = await pool.query(
-    `INSERT INTO devices
-      (nama_account, kontak_pemilik, device_name, imei, no_hp, pertama_diisi,
-       bayar_1_tahun, setahun_saat, terakhir_diisi, jam_diisi, akan_habis, jumlah_diisi, keterangan_json)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
-     RETURNING *`,
-    [
-      b.nama_account, b.kontak_pemilik, b.device_name, b.imei, b.no_hp,
-      b.pertama_diisi, b.bayar_1_tahun, b.setahun_saat, b.terakhir_diisi,
-      b.jam_diisi, b.akan_habis, b.jumlah_diisi || 0, b.keterangan_json || {},
-    ]
-  );
-  res.status(201).json(rows[0]);
+
+  if (!b.nama_account || !b.nama_account.trim()) {
+    return res.status(400).json({ error: 'Nama Account wajib diisi.' });
+  }
+  if (!b.no_hp || !b.no_hp.trim()) {
+    return res.status(400).json({ error: 'No HP wajib diisi.' });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO devices
+        (nama_account, kontak_pemilik, device_name, imei, no_hp, pertama_diisi,
+         bayar_1_tahun, setahun_saat, terakhir_diisi, jam_diisi, akan_habis, jumlah_diisi, keterangan_json)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+       RETURNING *`,
+      [
+        b.nama_account.trim(), b.kontak_pemilik || null, b.device_name || null,
+        b.imei || null, b.no_hp.trim(), b.pertama_diisi || null,
+        b.bayar_1_tahun || null, b.setahun_saat || null, b.terakhir_diisi || null,
+        b.jam_diisi || null, b.akan_habis || null, b.jumlah_diisi || 0, b.keterangan_json || {},
+      ]
+    );
+    res.status(201).json(rows[0]);
+  } catch (e) {
+    if (e.code === '23505') {
+      return res.status(409).json({ error: 'IMEI ini sudah dipakai device lain.' });
+    }
+    throw e;
+  }
 });
 
-// Update manual field apapun
+// Update manual field apapun (dibatasi ke kolom yang memang ada, supaya aman)
+const ALLOWED_DEVICE_FIELDS = new Set([
+  'nama_account', 'kontak_pemilik', 'device_name', 'imei', 'no_hp',
+  'pertama_diisi', 'bayar_1_tahun', 'setahun_saat', 'terakhir_diisi',
+  'jam_diisi', 'akan_habis', 'jumlah_diisi', 'keterangan_json', 'status',
+]);
+
 router.patch('/devices/:id', async (req, res) => {
-  const fields = Object.keys(req.body);
-  if (fields.length === 0) return res.status(400).json({ error: 'Tidak ada field untuk diupdate' });
+  const fields = Object.keys(req.body).filter((f) => ALLOWED_DEVICE_FIELDS.has(f));
+  if (fields.length === 0) return res.status(400).json({ error: 'Tidak ada field valid untuk diupdate' });
 
+  // Normalisasi string kosong jadi NULL untuk kolom tanggal/waktu, supaya tidak error
+  // "invalid input syntax" waktu form dikosongkan
+  const values = fields.map((f) => {
+    const v = req.body[f];
+    return v === '' ? null : v;
+  });
   const setClause = fields.map((f, i) => `${f} = $${i + 2}`).join(', ');
-  const values = fields.map((f) => req.body[f]);
 
-  const { rows } = await pool.query(
-    `UPDATE devices SET ${setClause}, updated_at = now() WHERE id = $1 RETURNING *`,
-    [req.params.id, ...values]
-  );
-  res.json(rows[0]);
+  try {
+    const { rows } = await pool.query(
+      `UPDATE devices SET ${setClause}, updated_at = now() WHERE id = $1 RETURNING *`,
+      [req.params.id, ...values]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Device tidak ditemukan' });
+    res.json(rows[0]);
+  } catch (e) {
+    if (e.code === '23505') {
+      return res.status(409).json({ error: 'IMEI ini sudah dipakai device lain.' });
+    }
+    throw e;
+  }
 });
 
 // Hapus / nonaktifkan device

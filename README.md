@@ -105,3 +105,29 @@ curl -X POST http://localhost:3000/api/run-check
 ```
 Ini memicu pengecekan & kirim WA manual, berguna buat testing sebelum
 benar-benar dijadwalkan.
+
+## Kolom Keterangan
+
+Kolom `Keterangan` dari Excel disimpan lengkap (baik catatan bebas seperti
+"Pasang baru+1tahun" maupun kredensial akun tracker seperti
+`{u:email, pe:xxx, p:xxx}`), tampil di dashboard, dan bisa diedit langsung
+dengan klik selnya.
+
+**Catatan penting**: kalau kamu sempat import data sebelum fitur ini
+ditambahkan, catatan bebas (non-kredensial) di baris-baris tersebut
+kemungkinan sudah hilang karena versi lama sistem cuma paham format
+kredensial. **Import ulang file Excel yang sama** dari dashboard untuk
+memulihkan catatan tersebut — data lain (nomor, tanggal, dst) tidak akan
+kepengaruh karena proses import pakai upsert berdasarkan IMEI.
+
+## Kelola Customer Manual
+
+Selain import dari Excel, kamu bisa tambah/edit customer langsung dari dashboard:
+
+- **➕ Tambah Customer**: buka form kosong, isi minimal Nama Account & No HP,
+  field lain opsional.
+- **Edit** (tombol biru di kolom Aksi tiap baris): buka form yang sudah
+  terisi data device tersebut, ubah field yang perlu, simpan.
+- Validasi otomatis: Nama Account & No HP wajib diisi, dan kalau IMEI yang
+  dimasukkan sudah dipakai device lain, sistem akan menolak dengan pesan
+  yang jelas (bukan error teknis).

@@ -39,6 +39,7 @@
 <div class="container">
   <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
     <button class="refresh" style="float:none" onclick="loadAll()">🔄 Refresh</button>
+    <button class="refresh" style="float:none;background:#0891b2" onclick="openDeviceModal()">➕ Tambah Customer</button>
     <button class="refresh" style="float:none;background:#7c3aed" onclick="openImport()">📥 Import Excel</button>
     <a class="refresh" style="float:none;background:#059669;text-decoration:none;color:#fff;display:inline-block" href="/api/export-excel">📤 Download Excel</a>
     <button class="refresh" style="float:none;background:#dc2626" onclick="runSchemaMigration()">🛠️ Perbaiki Database</button>
@@ -58,6 +59,72 @@
       <div style="display:flex;gap:8px">
         <button class="action" style="flex:1;padding:10px" onclick="doImport()">Import Sekarang</button>
         <button class="action" style="flex:1;padding:10px;background:#6b7280" onclick="closeImport()">Batal</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="deviceModal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.4);align-items:center;justify-content:center;z-index:50">
+    <div style="background:#fff;border-radius:12px;padding:24px;width:100%;max-width:560px;max-height:88vh;overflow-y:auto">
+      <h3 id="deviceModalTitle" style="margin-top:0">Tambah Customer Baru</h3>
+      <input type="hidden" id="deviceId">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Nama Account *</label>
+          <input id="f_nama_account" style="width:100%;padding:8px;border-radius:6px;border:1px solid #d1d5db">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Kontak Pemilik</label>
+          <input id="f_kontak_pemilik" style="width:100%;padding:8px;border-radius:6px;border:1px solid #d1d5db">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Device Name</label>
+          <input id="f_device_name" style="width:100%;padding:8px;border-radius:6px;border:1px solid #d1d5db">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">IMEI</label>
+          <input id="f_imei" style="width:100%;padding:8px;border-radius:6px;border:1px solid #d1d5db">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">No HP (SIM GPS) *</label>
+          <input id="f_no_hp" style="width:100%;padding:8px;border-radius:6px;border:1px solid #d1d5db">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Jumlah Diisi</label>
+          <input id="f_jumlah_diisi" type="number" min="0" style="width:100%;padding:8px;border-radius:6px;border:1px solid #d1d5db">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Pertama Diisi</label>
+          <input id="f_pertama_diisi" type="date" style="width:100%;padding:8px;border-radius:6px;border:1px solid #d1d5db">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Bayar 1 Tahun</label>
+          <input id="f_bayar_1_tahun" type="date" style="width:100%;padding:8px;border-radius:6px;border:1px solid #d1d5db">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Setahun Saat (jatuh tempo)</label>
+          <input id="f_setahun_saat" type="date" style="width:100%;padding:8px;border-radius:6px;border:1px solid #d1d5db">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Terakhir Diisi</label>
+          <input id="f_terakhir_diisi" type="date" style="width:100%;padding:8px;border-radius:6px;border:1px solid #d1d5db">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Jam Diisi</label>
+          <input id="f_jam_diisi" type="time" style="width:100%;padding:8px;border-radius:6px;border:1px solid #d1d5db">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Akan Habis</label>
+          <input id="f_akan_habis" type="date" style="width:100%;padding:8px;border-radius:6px;border:1px solid #d1d5db">
+        </div>
+      </div>
+      <div style="margin-top:12px">
+        <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Keterangan</label>
+        <textarea id="f_keterangan" rows="2" style="width:100%;padding:8px;border-radius:6px;border:1px solid #d1d5db;font-family:inherit"></textarea>
+      </div>
+      <div id="deviceModalStatus" style="font-size:13px;margin-top:10px"></div>
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button class="action" style="flex:1;padding:10px" onclick="saveDevice()">Simpan</button>
+        <button class="action" style="flex:1;padding:10px;background:#6b7280" onclick="closeDeviceModal()">Batal</button>
       </div>
     </div>
   </div>
@@ -83,6 +150,7 @@
         <th class="sortable" data-field="akan_habis">Akan Habis</th>
         <th class="sortable" data-field="jumlah_diisi">Jumlah Diisi</th>
         <th class="sortable" data-field="setahun_saat">Jatuh Tempo Tahunan</th>
+        <th>Keterangan</th>
         <th>Aksi</th>
       </tr>
     </thead>
@@ -144,6 +212,28 @@ function switchTab(tab) {
 
 function fmt(d) { return d ? new Date(d).toLocaleDateString('id-ID') : '-'; }
 
+function keteranganText(k) {
+  if (!k) return '';
+  const obj = k;
+  if ('raw' in obj || 'parsed' in obj) {
+    if (obj.parsed && Object.keys(obj.parsed).length > 0) {
+      return Object.entries(obj.parsed).map(([key, val]) => `${key}: ${val}`).join(', ');
+    }
+    return obj.raw || '';
+  }
+  // Kompatibilitas data lama
+  if (Object.keys(obj).length > 0) {
+    return Object.entries(obj).map(([key, val]) => `${key}: ${val}`).join(', ');
+  }
+  return '';
+}
+
+function escapeHtml(s) {
+  const div = document.createElement('div');
+  div.textContent = s;
+  return div.innerHTML;
+}
+
 function applySearch(data) {
   const q = document.getElementById('searchBox').value.trim().toLowerCase();
   if (!q) return data;
@@ -152,7 +242,8 @@ function applySearch(data) {
     (d.device_name || '').toLowerCase().includes(q) ||
     (d.no_hp || '').toLowerCase().includes(q) ||
     (d.imei || '').toLowerCase().includes(q) ||
-    (d.kontak_pemilik || '').toLowerCase().includes(q)
+    (d.kontak_pemilik || '').toLowerCase().includes(q) ||
+    keteranganText(d.keterangan_json).toLowerCase().includes(q)
   );
 }
 
@@ -187,7 +278,7 @@ function render() {
   const dueBillIds = new Set(dueBilling.map(d => d.id));
 
   if (data.length === 0) {
-    document.getElementById('tbody').innerHTML = `<tr><td colspan="9" style="text-align:center;color:#9ca3af;padding:24px">Tidak ada data yang cocok.</td></tr>`;
+    document.getElementById('tbody').innerHTML = `<tr><td colspan="10" style="text-align:center;color:#9ca3af;padding:24px">Tidak ada data yang cocok.</td></tr>`;
     return;
   }
 
@@ -201,12 +292,121 @@ function render() {
       <td>${fmt(d.akan_habis)} ${dueFillIds.has(d.id) ? '<span class="badge due">Jatuh tempo</span>' : ''}</td>
       <td>${d.jumlah_diisi}</td>
       <td>${fmt(d.setahun_saat)} ${dueBillIds.has(d.id) ? '<span class="badge warn">Perlu tagih</span>' : ''}</td>
+      <td class="keterangan-cell" style="max-width:180px;cursor:pointer" title="Klik untuk edit" onclick="editKeterangan(${d.id}, ${JSON.stringify(keteranganText(d.keterangan_json)).replace(/"/g, '&quot;')})">
+        <span style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(keteranganText(d.keterangan_json)) || '<span style=\"color:#9ca3af\">+ tambah</span>'}</span>
+      </td>
       <td>
         <button class="action" onclick="markFilled(${d.id})">Tandai Diisi</button>
         <button class="action secondary" onclick="markPaid(${d.id})">Tandai Bayar</button>
+        <button class="action" style="background:#2563eb" onclick="openDeviceModal(${d.id})">Edit</button>
       </td>
     </tr>
   `).join('');
+}
+
+async function editKeterangan(id, currentText) {
+  const newText = prompt('Edit keterangan:', currentText || '');
+  if (newText === null) return; // batal
+  await fetch(`/api/devices/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ keterangan_json: { raw: newText, parsed: {} } }),
+  });
+  loadAll();
+}
+
+// --- Tambah / Edit Customer ---
+
+const DEVICE_FORM_IDS = [
+  'f_nama_account', 'f_kontak_pemilik', 'f_device_name', 'f_imei', 'f_no_hp',
+  'f_pertama_diisi', 'f_bayar_1_tahun', 'f_setahun_saat', 'f_terakhir_diisi',
+  'f_jam_diisi', 'f_akan_habis', 'f_keterangan',
+];
+
+function valOrNull(id) {
+  const v = document.getElementById(id).value.trim();
+  return v === '' ? null : v;
+}
+
+async function openDeviceModal(id = null) {
+  document.getElementById('deviceId').value = id || '';
+  document.getElementById('deviceModalStatus').textContent = '';
+  DEVICE_FORM_IDS.forEach(fid => document.getElementById(fid).value = '');
+  document.getElementById('f_jumlah_diisi').value = 0;
+
+  if (id) {
+    document.getElementById('deviceModalTitle').textContent = 'Edit Customer';
+    const res = await fetch(`/api/devices/${id}`);
+    const d = await res.json();
+    document.getElementById('f_nama_account').value = d.nama_account || '';
+    document.getElementById('f_kontak_pemilik').value = d.kontak_pemilik || '';
+    document.getElementById('f_device_name').value = d.device_name || '';
+    document.getElementById('f_imei').value = d.imei || '';
+    document.getElementById('f_no_hp').value = d.no_hp || '';
+    document.getElementById('f_pertama_diisi').value = d.pertama_diisi ? String(d.pertama_diisi).slice(0, 10) : '';
+    document.getElementById('f_bayar_1_tahun').value = d.bayar_1_tahun ? String(d.bayar_1_tahun).slice(0, 10) : '';
+    document.getElementById('f_setahun_saat').value = d.setahun_saat ? String(d.setahun_saat).slice(0, 10) : '';
+    document.getElementById('f_terakhir_diisi').value = d.terakhir_diisi ? String(d.terakhir_diisi).slice(0, 10) : '';
+    document.getElementById('f_jam_diisi').value = d.jam_diisi ? String(d.jam_diisi).slice(0, 5) : '';
+    document.getElementById('f_akan_habis').value = d.akan_habis ? String(d.akan_habis).slice(0, 10) : '';
+    document.getElementById('f_jumlah_diisi').value = d.jumlah_diisi ?? 0;
+    document.getElementById('f_keterangan').value = keteranganText(d.keterangan_json);
+  } else {
+    document.getElementById('deviceModalTitle').textContent = 'Tambah Customer Baru';
+  }
+
+  const modal = document.getElementById('deviceModal');
+  modal.classList.remove('hidden');
+  modal.style.display = 'flex';
+}
+
+function closeDeviceModal() {
+  const modal = document.getElementById('deviceModal');
+  modal.classList.add('hidden');
+  modal.style.display = 'none';
+}
+
+async function saveDevice() {
+  const id = document.getElementById('deviceId').value;
+  const namaAccount = document.getElementById('f_nama_account').value.trim();
+  const noHp = document.getElementById('f_no_hp').value.trim();
+
+  if (!namaAccount || !noHp) {
+    document.getElementById('deviceModalStatus').textContent = '❌ Nama Account dan No HP wajib diisi.';
+    return;
+  }
+
+  const payload = {
+    nama_account: namaAccount,
+    kontak_pemilik: valOrNull('f_kontak_pemilik'),
+    device_name: valOrNull('f_device_name'),
+    imei: valOrNull('f_imei'),
+    no_hp: noHp,
+    pertama_diisi: valOrNull('f_pertama_diisi'),
+    bayar_1_tahun: valOrNull('f_bayar_1_tahun'),
+    setahun_saat: valOrNull('f_setahun_saat'),
+    terakhir_diisi: valOrNull('f_terakhir_diisi'),
+    jam_diisi: valOrNull('f_jam_diisi'),
+    akan_habis: valOrNull('f_akan_habis'),
+    jumlah_diisi: parseInt(document.getElementById('f_jumlah_diisi').value, 10) || 0,
+    keterangan_json: { raw: document.getElementById('f_keterangan').value.trim(), parsed: {} },
+  };
+
+  document.getElementById('deviceModalStatus').textContent = 'Menyimpan...';
+  const res = await fetch(id ? `/api/devices/${id}` : '/api/devices', {
+    method: id ? 'PATCH' : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+
+  if (!res.ok) {
+    document.getElementById('deviceModalStatus').textContent = '❌ ' + (data.error || 'Gagal menyimpan.');
+    return;
+  }
+
+  closeDeviceModal();
+  loadAll();
 }
 
 async function markFilled(id) {

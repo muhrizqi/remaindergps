@@ -44,7 +44,7 @@
   </div>
   <div class="summary" id="summary"></div>
 
-  <div id="importModal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:50">
+  <div id="importModal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.4);align-items:center;justify-content:center;z-index:50">
     <div style="background:#fff;border-radius:12px;padding:24px;width:100%;max-width:420px">
       <h3 style="margin-top:0">Import Data dari Excel</h3>
       <p style="font-size:13px;color:#6b7280">Upload file Excel lama kamu (kolom: nama account, Kontak Pemilik, Device Name, imei, no hp, dst). Data dengan IMEI yang sama akan di-update, yang baru akan ditambahkan.</p>
@@ -67,11 +67,22 @@
     <div class="tab" data-tab="billing" onclick="switchTab('billing')">Perlu Ditagih</div>
   </div>
 
+  <input type="text" id="searchBox" placeholder="🔍 Cari nama account, device, no HP, atau IMEI..."
+    style="width:100%;padding:10px 14px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;margin-bottom:14px;background:#fff"
+    oninput="render()">
+
   <table>
     <thead>
       <tr>
-        <th>Nama Account</th><th>Device</th><th>No HP</th><th>IMEI</th>
-        <th>Terakhir Diisi</th><th>Akan Habis</th><th>Jumlah Diisi</th><th>Jatuh Tempo Tahunan</th><th>Aksi</th>
+        <th class="sortable" data-field="nama_account">Nama Account</th>
+        <th class="sortable" data-field="device_name">Device</th>
+        <th class="sortable" data-field="no_hp">No HP</th>
+        <th class="sortable" data-field="imei">IMEI</th>
+        <th class="sortable" data-field="terakhir_diisi">Terakhir Diisi</th>
+        <th class="sortable" data-field="akan_habis">Akan Habis</th>
+        <th class="sortable" data-field="jumlah_diisi">Jumlah Diisi</th>
+        <th class="sortable" data-field="setahun_saat">Jatuh Tempo Tahunan</th>
+        <th>Aksi</th>
       </tr>
     </thead>
     <tbody id="tbody"></tbody>
@@ -81,6 +92,30 @@
 <script>
 let currentTab = 'all';
 let allDevices = [], dueFill = [], dueBilling = [];
+let sortField = 'nama_account';
+let sortDir = 'asc'; // 'asc' | 'desc'
+
+document.querySelectorAll('th.sortable').forEach(th => {
+  th.style.cursor = 'pointer';
+  th.style.userSelect = 'none';
+  th.addEventListener('click', () => {
+    const field = th.dataset.field;
+    if (sortField === field) {
+      sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+      sortField = field;
+      sortDir = 'asc';
+    }
+    render();
+  });
+});
+
+function updateSortIndicators() {
+  document.querySelectorAll('th.sortable').forEach(th => {
+    const base = th.textContent.replace(/ ▲| ▼/g, '');
+    th.textContent = base + (th.dataset.field === sortField ? (sortDir === 'asc' ? ' ▲' : ' ▼') : '');
+  });
+}
 
 async function loadAll() {
   [allDevices, dueFill, dueBilling] = await Promise.all([
@@ -108,10 +143,52 @@ function switchTab(tab) {
 
 function fmt(d) { return d ? new Date(d).toLocaleDateString('id-ID') : '-'; }
 
+function applySearch(data) {
+  const q = document.getElementById('searchBox').value.trim().toLowerCase();
+  if (!q) return data;
+  return data.filter(d =>
+    (d.nama_account || '').toLowerCase().includes(q) ||
+    (d.device_name || '').toLowerCase().includes(q) ||
+    (d.no_hp || '').toLowerCase().includes(q) ||
+    (d.imei || '').toLowerCase().includes(q) ||
+    (d.kontak_pemilik || '').toLowerCase().includes(q)
+  );
+}
+
+function applySort(data) {
+  const dateFields = ['terakhir_diisi', 'akan_habis', 'setahun_saat'];
+  const numberFields = ['jumlah_diisi'];
+  return [...data].sort((a, b) => {
+    let va = a[sortField], vb = b[sortField];
+    if (dateFields.includes(sortField)) {
+      va = va ? new Date(va).getTime() : -Infinity;
+      vb = vb ? new Date(vb).getTime() : -Infinity;
+    } else if (numberFields.includes(sortField)) {
+      va = Number(va) || 0;
+      vb = Number(vb) || 0;
+    } else {
+      va = (va || '').toString().toLowerCase();
+      vb = (vb || '').toString().toLowerCase();
+    }
+    if (va < vb) return sortDir === 'asc' ? -1 : 1;
+    if (va > vb) return sortDir === 'asc' ? 1 : -1;
+    return 0;
+  });
+}
+
 function render() {
-  const data = currentTab === 'all' ? allDevices : currentTab === 'fill' ? dueFill : dueBilling;
+  updateSortIndicators();
+  let data = currentTab === 'all' ? allDevices : currentTab === 'fill' ? dueFill : dueBilling;
+  data = applySearch(data);
+  data = applySort(data);
+
   const dueFillIds = new Set(dueFill.map(d => d.id));
   const dueBillIds = new Set(dueBilling.map(d => d.id));
+
+  if (data.length === 0) {
+    document.getElementById('tbody').innerHTML = `<tr><td colspan="9" style="text-align:center;color:#9ca3af;padding:24px">Tidak ada data yang cocok.</td></tr>`;
+    return;
+  }
 
   document.getElementById('tbody').innerHTML = data.map(d => `
     <tr>
@@ -155,13 +232,17 @@ async function logout() {
 }
 
 function openImport() {
-  document.getElementById('importModal').classList.remove('hidden');
+  const modal = document.getElementById('importModal');
+  modal.classList.remove('hidden');
+  modal.style.display = 'flex';
   document.getElementById('sheetPicker').classList.add('hidden');
   document.getElementById('importStatus').textContent = '';
   document.getElementById('excelFile').value = '';
 }
 function closeImport() {
-  document.getElementById('importModal').classList.add('hidden');
+  const modal = document.getElementById('importModal');
+  modal.classList.add('hidden');
+  modal.style.display = 'none';
 }
 
 document.getElementById('excelFile').addEventListener('change', async (e) => {

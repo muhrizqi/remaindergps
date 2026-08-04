@@ -9,6 +9,7 @@ const updateRoutes = require('./routes/update');
 const authRoutes = require('./routes/auth');
 const { requireAuth } = require('./middleware/auth');
 const { startCron } = require('./cron');
+const { ensureSchema } = require('./db');
 
 const app = express();
 app.set('trust proxy', 1); // penting kalau di belakang reverse proxy (Coolify/Traefik) supaya cookie secure jalan
@@ -60,7 +61,23 @@ process.on('unhandledRejection', (reason) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server jalan di port ${PORT}`);
-  startCron();
-});
+
+// Jalankan migrasi schema database otomatis tiap kali server start.
+// Aman diulang - schema.sql pakai CREATE TABLE IF NOT EXISTS.
+// Ini menghindari kebutuhan akses terminal manual (misal kalau terminal Coolify bermasalah).
+async function start() {
+  try {
+    await ensureSchema();
+    console.log('[startup] Schema database siap.');
+  } catch (e) {
+    console.error('[startup] Gagal menjalankan schema database:', e.message);
+    console.error('[startup] Server tetap jalan, tapi fitur yang butuh DB kemungkinan error sampai ini diperbaiki.');
+  }
+
+  app.listen(PORT, () => {
+    console.log(`Server jalan di port ${PORT}`);
+    startCron();
+  });
+}
+
+start();

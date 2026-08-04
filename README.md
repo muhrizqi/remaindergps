@@ -57,14 +57,10 @@ Dashboard: http://localhost:3000
    - `ADMIN_WA_NUMBER` → nomor WA kamu sendiri, format `62xxxxxxxxxx@c.us`
    - `BASE_URL` → domain publik app ini, misal `https://gps.lewat.web.id`
 5. Set subdomain `gps.lewat.web.id` mengarah ke app ini (via Zoraxy/EasyPanel)
-6. Setelah container jalan, exec masuk container sekali untuk:
-   ```bash
-   npm run migrate:schema
-   ```
-   Untuk import data Excel, **tidak perlu lagi masuk terminal** — buka
-   dashboard web, login, klik tombol **"📥 Import Excel"**, upload file
-   Excel lama kamu, pilih sheet-nya, klik Import. Data dengan IMEI yang
-   sama otomatis di-update, yang baru ditambahkan.
+6. **Schema database jalan otomatis** setiap kali container start — tidak perlu masuk
+   terminal sama sekali. Kalau karena suatu hal auto-migrate gagal (misal DB belum
+   siap saat container pertama kali start), ada tombol **"🛠️ Perbaiki Database"**
+   di dashboard buat menjalankan ulang secara manual, atau restart container-nya.
 
 ## Alur Harian
 
@@ -89,6 +85,18 @@ jumlah_diisi, keterangan_json (u/pe/p kredensial akun tracker)`
 
 Riwayat tersimpan di tabel `fill_logs` (tiap pengisian & pembayaran) dan
 `notification_logs` (mencegah WA dobel di hari yang sama).
+
+## Tanpa Akses Terminal (Coolify dll)
+
+Kalau terminal di panel hosting kamu tidak bisa dipakai, semuanya tetap bisa jalan:
+
+- **Schema database**: otomatis dijalankan setiap kali server start (aman diulang).
+  Kalau perlu re-run manual, klik tombol **"🛠️ Perbaiki Database"** di dashboard.
+- **Import data lama**: klik tombol **"📥 Import Excel"** di dashboard, upload file,
+  pilih sheet, klik Import.
+- **Backup data**: klik tombol **"📤 Download Excel"** di dashboard kapan saja.
+
+Semua operasi di atas bisa dilakukan 100% lewat browser tanpa SSH/terminal.
 
 ## Testing Cepat Tanpa Nunggu Cron
 

@@ -5,7 +5,7 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "migrate:schema": "node -e \"require('./src/db').runSchema()\"",
+    "migrate:schema": "node src/db.js",
     "migrate:excel": "node src/migrate-excel.js"
   },
   "dependencies": {

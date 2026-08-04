@@ -91,6 +91,14 @@ router.get('/export-excel', async (req, res) => {
   res.send(buffer);
 });
 
+// Jalankan/ulangi migrasi schema database secara manual dari dashboard
+// (cadangan kalau auto-migrate saat startup gagal, tanpa perlu akses terminal)
+router.post('/run-schema-migration', async (req, res) => {
+  const { ensureSchema } = require('../db');
+  await ensureSchema();
+  res.json({ ok: true, message: 'Schema database berhasil dijalankan/diperbarui.' });
+});
+
 // List semua device
 router.get('/devices', async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM devices ORDER BY nama_account');

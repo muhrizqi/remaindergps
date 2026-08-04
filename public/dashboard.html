@@ -40,6 +40,7 @@
     <button class="refresh" style="float:none" onclick="loadAll()">🔄 Refresh</button>
     <button class="refresh" style="float:none;background:#7c3aed" onclick="openImport()">📥 Import Excel</button>
     <a class="refresh" style="float:none;background:#059669;text-decoration:none;color:#fff;display:inline-block" href="/api/export-excel">📤 Download Excel</a>
+    <button class="refresh" style="float:none;background:#dc2626" onclick="runSchemaMigration()">🛠️ Perbaiki Database</button>
   </div>
   <div class="summary" id="summary"></div>
 
@@ -137,6 +138,14 @@ async function markFilled(id) {
 async function markPaid(id) {
   if (!confirm('Tandai device ini sudah bayar perpanjangan tahunan? Siklus akan direset.')) return;
   await fetch(`/api/devices/${id}/mark-paid`, { method: 'POST' });
+  loadAll();
+}
+
+async function runSchemaMigration() {
+  if (!confirm('Jalankan/perbarui skema database sekarang?')) return;
+  const res = await fetch('/api/run-schema-migration', { method: 'POST' });
+  const data = await res.json();
+  alert(data.ok ? '✅ ' + data.message : '❌ ' + (data.error || 'Gagal'));
   loadAll();
 }
 

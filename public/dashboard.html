@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard Pulsa GPS Tracker</title>
+<style>
+  :root{--green:#16a34a;--red:#dc2626;--amber:#d97706;--bg:#f5f6f8}
+  *{box-sizing:border-box}
+  body{font-family:system-ui,-apple-system,sans-serif;margin:0;background:var(--bg);color:#1f2937}
+  header{background:#111827;color:#fff;padding:16px 20px}
+  header h1{margin:0;font-size:18px}
+  .container{max-width:1100px;margin:0 auto;padding:20px}
+  .tabs{display:flex;gap:8px;margin-bottom:16px}
+  .tab{padding:8px 16px;border-radius:8px;background:#e5e7eb;cursor:pointer;font-size:14px}
+  .tab.active{background:#111827;color:#fff}
+  .summary{display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+  .stat{background:#fff;border-radius:10px;padding:14px 18px;box-shadow:0 1px 3px rgba(0,0,0,.06);min-width:140px}
+  .stat .num{font-size:24px;font-weight:700}
+  .stat .label{font-size:12px;color:#6b7280}
+  table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+  th,td{padding:10px 12px;text-align:left;font-size:13px;border-bottom:1px solid #f0f1f3}
+  th{background:#f9fafb;color:#6b7280;font-weight:600}
+  .badge{padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600}
+  .badge.due{background:#fee2e2;color:var(--red)}
+  .badge.ok{background:#dcfce7;color:var(--green)}
+  .badge.warn{background:#fef3c7;color:var(--amber)}
+  button.action{padding:6px 10px;border-radius:6px;border:none;background:var(--green);color:#fff;font-size:12px;cursor:pointer}
+  button.secondary{background:var(--amber)}
+  .refresh{float:right;padding:8px 14px;border-radius:8px;border:none;background:#2563eb;color:#fff;cursor:pointer;font-size:13px}
+</style>
+</head>
+<body>
+<header><h1>📡 Dashboard Pulsa GPS Tracker</h1></header>
+<div class="container">
+  <button class="refresh" onclick="loadAll()">🔄 Refresh</button>
+  <div class="summary" id="summary"></div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="all" onclick="switchTab('all')">Semua Device</div>
+    <div class="tab" data-tab="fill" onclick="switchTab('fill')">Perlu Isi Hari Ini</div>
+    <div class="tab" data-tab="billing" onclick="switchTab('billing')">Perlu Ditagih</div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Nama Account</th><th>Device</th><th>No HP</th><th>IMEI</th>
+        <th>Terakhir Diisi</th><th>Akan Habis</th><th>Jumlah Diisi</th><th>Jatuh Tempo Tahunan</th><th>Aksi</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+</div>
+
+<script>
+let currentTab = 'all';
+let allDevices = [], dueFill = [], dueBilling = [];
+
+async function loadAll() {
+  [allDevices, dueFill, dueBilling] = await Promise.all([
+    fetch('/api/devices').then(r => r.json()),
+    fetch('/api/due/fill').then(r => r.json()),
+    fetch('/api/due/billing').then(r => r.json()),
+  ]);
+  renderSummary();
+  render();
+}
+
+function renderSummary() {
+  document.getElementById('summary').innerHTML = `
+    <div class="stat"><div class="num">${allDevices.length}</div><div class="label">Total Device</div></div>
+    <div class="stat"><div class="num" style="color:var(--red)">${dueFill.length}</div><div class="label">Perlu Isi Hari Ini</div></div>
+    <div class="stat"><div class="num" style="color:var(--amber)">${dueBilling.length}</div><div class="label">Perlu Ditagih</div></div>
+  `;
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  render();
+}
+
+function fmt(d) { return d ? new Date(d).toLocaleDateString('id-ID') : '-'; }
+
+function render() {
+  const data = currentTab === 'all' ? allDevices : currentTab === 'fill' ? dueFill : dueBilling;
+  const dueFillIds = new Set(dueFill.map(d => d.id));
+  const dueBillIds = new Set(dueBilling.map(d => d.id));
+
+  document.getElementById('tbody').innerHTML = data.map(d => `
+    <tr>
+      <td>${d.nama_account}</td>
+      <td>${d.device_name || '-'}</td>
+      <td>${d.no_hp}</td>
+      <td>${d.imei || '-'}</td>
+      <td>${fmt(d.terakhir_diisi)}</td>
+      <td>${fmt(d.akan_habis)} ${dueFillIds.has(d.id) ? '<span class="badge due">Jatuh tempo</span>' : ''}</td>
+      <td>${d.jumlah_diisi}</td>
+      <td>${fmt(d.setahun_saat)} ${dueBillIds.has(d.id) ? '<span class="badge warn">Perlu tagih</span>' : ''}</td>
+      <td>
+        <button class="action" onclick="markFilled(${d.id})">Tandai Diisi</button>
+        <button class="action secondary" onclick="markPaid(${d.id})">Tandai Bayar</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function markFilled(id) {
+  await fetch(`/api/devices/${id}/mark-filled`, { method: 'POST' });
+  loadAll();
+}
+async function markPaid(id) {
+  if (!confirm('Tandai device ini sudah bayar perpanjangan tahunan? Siklus akan direset.')) return;
+  await fetch(`/api/devices/${id}/mark-paid`, { method: 'POST' });
+  loadAll();
+}
+
+loadAll();
+</script>
+</body>
+</html>

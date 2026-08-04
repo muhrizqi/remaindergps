@@ -1,0 +1,21 @@
+{
+  "name": "gps-pulsa-system",
+  "version": "1.0.0",
+  "description": "Sistem reminder & pencatatan pengisian pulsa GPS tracker via WhatsApp/WAHA",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "migrate:schema": "node -e \"require('./src/db').runSchema()\"",
+    "migrate:excel": "node src/migrate-excel.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "pg": "^8.12.0",
+    "dotenv": "^16.4.5",
+    "node-cron": "^3.0.3",
+    "axios": "^1.7.7",
+    "jsonwebtoken": "^9.0.2",
+    "xlsx": "^0.18.5",
+    "ejs": "^3.1.10"
+  }
+}

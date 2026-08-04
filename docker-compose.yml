@@ -1,0 +1,28 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gps_user
+      POSTGRES_PASSWORD: gps_pass
+      POSTGRES_DB: gps_pulsa
+    volumes:
+      - gps_pg_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://gps_user:gps_pass@postgres:5432/gps_pulsa
+    ports:
+      - "3000:3000"
+
+volumes:
+  gps_pg_data:

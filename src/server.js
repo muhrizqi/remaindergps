@@ -6,6 +6,7 @@ const session = require('express-session');
 
 const apiRoutes = require('./routes/api');
 const updateRoutes = require('./routes/update');
+const batchRoutes = require('./routes/batch');
 const authRoutes = require('./routes/auth');
 const { requireAuth } = require('./middleware/auth');
 const { startCron } = require('./cron');
@@ -35,6 +36,7 @@ app.use('/', authRoutes);
 
 // Magic-link dari WA (pakai token sendiri, bukan session) TIDAK butuh auth
 app.use(updateRoutes);
+app.use(batchRoutes);
 
 // Health check untuk Coolify/Docker - HARUS bisa diakses tanpa login
 app.get('/health', (req, res) => res.json({ ok: true }));

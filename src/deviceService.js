@@ -107,6 +107,37 @@ async function markNotified(deviceId, notifType) {
   );
 }
 
+// Cek apakah semua device dalam daftar ID ini sudah diisi HARI INI
+async function areAllFilledToday(deviceIds) {
+  if (!deviceIds || deviceIds.length === 0) return false;
+  const { rows } = await pool.query(
+    `SELECT count(*)::int AS cnt FROM devices WHERE id = ANY($1::int[]) AND terakhir_diisi = $2`,
+    [deviceIds, todayStr()]
+  );
+  return rows[0].cnt >= deviceIds.length;
+}
+
+// Coba catat "event harian" (misal ucapan terima kasih) - hanya berhasil sekali per hari.
+// Return true kalau ini adalah yang pertama kali (jadi WA boleh dikirim),
+// false kalau sudah pernah tercatat sebelumnya (jangan kirim WA lagi).
+async function tryClaimDailyEvent(eventType) {
+  const { rowCount } = await pool.query(
+    `INSERT INTO daily_events (event_date, event_type) VALUES ($1, $2)
+     ON CONFLICT (event_date, event_type) DO NOTHING`,
+    [todayStr(), eventType]
+  );
+  return rowCount > 0;
+}
+
+async function getDevicesByIds(deviceIds) {
+  if (!deviceIds || deviceIds.length === 0) return [];
+  const { rows } = await pool.query(
+    `SELECT * FROM devices WHERE id = ANY($1::int[]) ORDER BY nama_account`,
+    [deviceIds]
+  );
+  return rows;
+}
+
 module.exports = {
   getDevicesDueForFillToday,
   getDevicesDueForBillingToday,
@@ -115,4 +146,7 @@ module.exports = {
   getDeviceById,
   wasNotifiedToday,
   markNotified,
+  areAllFilledToday,
+  tryClaimDailyEvent,
+  getDevicesByIds,
 };

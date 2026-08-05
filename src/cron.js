@@ -1,6 +1,6 @@
 const cron = require('node-cron');
 const { sendText } = require('./waha');
-const { makeDailyToken } = require('./token');
+const { makeDailyToken, makeBatchToken } = require('./token');
 const {
   getDevicesDueForFillToday,
   getDevicesDueForBillingToday,
@@ -20,26 +20,33 @@ function fmtDate(d) {
 async function runDailyCheck() {
   console.log('[cron] Menjalankan pengecekan harian...');
 
-  // 1) Reminder isi pulsa
+  // 1) Reminder isi pulsa - SATU link buat semua device yang jatuh tempo hari ini,
+  // supaya bisa ditandai satu-satu dari satu halaman (menghindari isi dobel).
   const dueFill = await getDevicesDueForFillToday();
-  const fillItems = [];
+  const toNotify = [];
   for (const d of dueFill) {
     if (await wasNotifiedToday(d.id, 'fill_reminder')) continue;
-    const token = makeDailyToken(d.id, 'fill');
-    const link = `${BASE_URL}/u/${token}`;
-    fillItems.push(
-      `• *${d.nama_account}* (${d.device_name || '-'})\n  No: ${d.no_hp}\n  IMEI: ${d.imei}\n  Isi ke-${d.jumlah_diisi + 1}\n  Tandai selesai: ${link}`
-    );
-    await markNotified(d.id, 'fill_reminder');
+    toNotify.push(d);
   }
 
-  if (fillItems.length > 0) {
+  if (toNotify.length > 0) {
+    const token = makeBatchToken(toNotify.map((d) => d.id));
+    const link = `${BASE_URL}/batch/${token}`;
+    const listText = toNotify
+      .map((d) => `• *${d.nama_account}* (${d.device_name || '-'}) - ${d.no_hp}`)
+      .join('\n');
+
     const msg =
       `🔋 *Reminder Isi Pulsa GPS - ${fmtDate(new Date())}*\n\n` +
-      `Ada ${fillItems.length} device yang perlu diisi pulsa hari ini:\n\n` +
-      fillItems.join('\n\n') +
-      `\n\nKlik link di atas setelah selesai isi pulsa masing-masing, sistem otomatis update.`;
+      `Ada ${toNotify.length} nomor yang perlu diisi pulsa hari ini:\n\n` +
+      listText +
+      `\n\n👉 Buka & tandai satu-satu di sini:\n${link}\n\n` +
+      `Setelah semua ditandai selesai, kamu akan dapat notifikasi konfirmasi.`;
+
     await sendText(ADMIN_WA_NUMBER, msg);
+    for (const d of toNotify) {
+      await markNotified(d.id, 'fill_reminder');
+    }
   } else {
     console.log('[cron] Tidak ada device yang perlu diisi hari ini.');
   }
@@ -52,7 +59,12 @@ async function runDailyCheck() {
     const token = makeDailyToken(d.id, 'paid');
     const link = `${BASE_URL}/u/${token}`;
     billingItems.push(
-      `• *${d.nama_account}*\n  Kontak: ${d.kontak_pemilik || '-'}\n  Jumlah diisi: ${d.jumlah_diisi}x | Jatuh tempo: ${fmtDate(d.setahun_saat)}\n  Tandai sudah bayar: ${link}`
+      `• *${d.nama_account}*\n` +
+        `  Kendaraan: ${d.device_name || '-'}\n` +
+        `  No HP GPS: ${d.no_hp}\n` +
+        `  Kontak: ${d.kontak_pemilik || '-'}\n` +
+        `  Jumlah diisi: ${d.jumlah_diisi}x | Jatuh tempo: ${fmtDate(d.setahun_saat)}\n` +
+        `  Tandai sudah bayar: ${link}`
     );
     await markNotified(d.id, 'billing_reminder');
 

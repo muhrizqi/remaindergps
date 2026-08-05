@@ -43,3 +43,12 @@ CREATE TABLE IF NOT EXISTS notification_logs (
   created_at  TIMESTAMPTZ DEFAULT now(),
   UNIQUE(device_id, notif_type, sent_date)
 );
+
+-- Event harian global (dedup notifikasi yang tidak spesifik per-device,
+-- misal "ucapan terima kasih semua sudah diisi hari ini")
+CREATE TABLE IF NOT EXISTS daily_events (
+  event_date  DATE NOT NULL,
+  event_type  TEXT NOT NULL,
+  created_at  TIMESTAMPTZ DEFAULT now(),
+  PRIMARY KEY (event_date, event_type)
+);

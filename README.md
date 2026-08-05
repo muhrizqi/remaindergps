@@ -65,14 +65,20 @@ Dashboard: http://localhost:3000
 ## Alur Harian
 
 1. Jam `CRON_SCHEDULE` (default 07:00 WIB), sistem cek:
-   - Device dengan `akan_habis <= hari ini` → kirim reminder isi pulsa ke WA kamu
-   - Device dengan `jumlah_diisi >= 13` atau `setahun_saat <= hari ini` → kirim reminder tagih
-2. Tiap device di pesan WA ada link `https://.../u/<token>` yang aman
-   (kadaluwarsa otomatis di akhir hari), tinggal klik dari HP setelah selesai isi pulsa
-3. Klik link → halaman konfirmasi ringkas → tekan tombol → otomatis update
-   `terakhir_diisi`, `jam_diisi`, `jumlah_diisi +1`, `akan_habis` (+28 hari)
-4. Untuk billing: klik link "Tandai sudah bayar" setelah customer transfer →
-   otomatis reset `bayar_1_tahun`, `setahun_saat` (+1 tahun), `jumlah_diisi = 1`
+   - Device dengan `akan_habis <= hari ini` → kirim **SATU** WA berisi daftar
+     semua nomor yang perlu diisi + **satu link** yang menampilkan semuanya
+     sekaligus dengan tombol "Tandai Selesai" masing-masing
+   - Device dengan `jumlah_diisi >= 13` atau `setahun_saat <= hari ini` → kirim reminder tagih,
+     lengkap dengan nama kendaraan & no HP GPS supaya gampang disebutkan ke customer
+2. Buka link dari WA → halaman menampilkan semua nomor jatuh tempo hari itu.
+   Tandai satu-satu setelah selesai diisi — tombol yang sudah ditekan berubah
+   warna jadi "✅ Sudah Diisi" dan tidak bisa dipencet ulang, jadi kamu tidak
+   akan salah isi dua kali.
+3. Setelah **semua** nomor di link itu ditandai selesai, sistem otomatis kirim
+   WA ucapan terima kasih terpisah.
+4. Untuk billing: klik link "Tandai sudah bayar" (link individual, dikirim
+   dalam satu pesan berisi daftar semua yang perlu ditagih) setelah customer
+   transfer → otomatis reset `bayar_1_tahun`, `setahun_saat` (+1 tahun), `jumlah_diisi = 1`
 5. Semua ini juga bisa dilakukan manual lewat dashboard web (`/`) tanpa WA,
    kalau kamu sedang buka laptop
 

@@ -94,19 +94,43 @@
         </div>
         <div>
           <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Pertama Diisi</label>
-          <input id="f_pertama_diisi" type="text" placeholder="dd/mm/yyyy" maxlength="10" style="width:100%;padding:8px;border-radius:6px;border:1px solid #d1d5db">
+          <div style="display:flex;gap:4px">
+            <input id="f_pertama_diisi" type="text" placeholder="dd/mm/yyyy" maxlength="10" style="flex:1;padding:8px;border-radius:6px;border:1px solid #d1d5db">
+            <div style="position:relative;width:38px;flex-shrink:0">
+              <button type="button" tabindex="-1" style="width:100%;height:100%;border-radius:6px;border:1px solid #d1d5db;background:#f9fafb;cursor:pointer">📅</button>
+              <input type="date" id="f_pertama_diisi_native" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%">
+            </div>
+          </div>
         </div>
         <div>
           <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Bayar 1 Tahun</label>
-          <input id="f_bayar_1_tahun" type="text" placeholder="dd/mm/yyyy" maxlength="10" style="width:100%;padding:8px;border-radius:6px;border:1px solid #d1d5db">
+          <div style="display:flex;gap:4px">
+            <input id="f_bayar_1_tahun" type="text" placeholder="dd/mm/yyyy" maxlength="10" style="flex:1;padding:8px;border-radius:6px;border:1px solid #d1d5db">
+            <div style="position:relative;width:38px;flex-shrink:0">
+              <button type="button" tabindex="-1" style="width:100%;height:100%;border-radius:6px;border:1px solid #d1d5db;background:#f9fafb;cursor:pointer">📅</button>
+              <input type="date" id="f_bayar_1_tahun_native" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%">
+            </div>
+          </div>
         </div>
         <div>
           <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Setahun Saat (jatuh tempo)</label>
-          <input id="f_setahun_saat" type="text" placeholder="dd/mm/yyyy" maxlength="10" style="width:100%;padding:8px;border-radius:6px;border:1px solid #d1d5db">
+          <div style="display:flex;gap:4px">
+            <input id="f_setahun_saat" type="text" placeholder="dd/mm/yyyy" maxlength="10" style="flex:1;padding:8px;border-radius:6px;border:1px solid #d1d5db">
+            <div style="position:relative;width:38px;flex-shrink:0">
+              <button type="button" tabindex="-1" style="width:100%;height:100%;border-radius:6px;border:1px solid #d1d5db;background:#f9fafb;cursor:pointer">📅</button>
+              <input type="date" id="f_setahun_saat_native" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%">
+            </div>
+          </div>
         </div>
         <div>
           <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Terakhir Diisi</label>
-          <input id="f_terakhir_diisi" type="text" placeholder="dd/mm/yyyy" maxlength="10" style="width:100%;padding:8px;border-radius:6px;border:1px solid #d1d5db">
+          <div style="display:flex;gap:4px">
+            <input id="f_terakhir_diisi" type="text" placeholder="dd/mm/yyyy" maxlength="10" style="flex:1;padding:8px;border-radius:6px;border:1px solid #d1d5db">
+            <div style="position:relative;width:38px;flex-shrink:0">
+              <button type="button" tabindex="-1" style="width:100%;height:100%;border-radius:6px;border:1px solid #d1d5db;background:#f9fafb;cursor:pointer">📅</button>
+              <input type="date" id="f_terakhir_diisi_native" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%">
+            </div>
+          </div>
         </div>
         <div>
           <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Jam Diisi</label>
@@ -114,7 +138,13 @@
         </div>
         <div>
           <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Akan Habis</label>
-          <input id="f_akan_habis" type="text" placeholder="dd/mm/yyyy" maxlength="10" style="width:100%;padding:8px;border-radius:6px;border:1px solid #d1d5db">
+          <div style="display:flex;gap:4px">
+            <input id="f_akan_habis" type="text" placeholder="dd/mm/yyyy" maxlength="10" style="flex:1;padding:8px;border-radius:6px;border:1px solid #d1d5db">
+            <div style="position:relative;width:38px;flex-shrink:0">
+              <button type="button" tabindex="-1" style="width:100%;height:100%;border-radius:6px;border:1px solid #d1d5db;background:#f9fafb;cursor:pointer">📅</button>
+              <input type="date" id="f_akan_habis_native" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%">
+            </div>
+          </div>
         </div>
       </div>
       <div style="margin-top:12px">
@@ -137,25 +167,46 @@
 
   <input type="text" id="searchBox" placeholder="🔍 Cari nama account, device, no HP, atau IMEI..."
     style="width:100%;padding:10px 14px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;margin-bottom:14px;background:#fff"
-    oninput="render()">
+    oninput="currentPage = 1; render()">
 
-  <table>
-    <thead>
-      <tr>
-        <th class="sortable" data-field="nama_account">Nama Account</th>
-        <th class="sortable" data-field="device_name">Device</th>
-        <th class="sortable" data-field="no_hp">No HP</th>
-        <th class="sortable" data-field="imei">IMEI</th>
-        <th class="sortable" data-field="terakhir_diisi">Terakhir Diisi</th>
-        <th class="sortable" data-field="akan_habis">Akan Habis</th>
-        <th class="sortable" data-field="jumlah_diisi">Jumlah Diisi</th>
-        <th class="sortable" data-field="setahun_saat">Jatuh Tempo Tahunan</th>
-        <th>Keterangan</th>
-        <th>Aksi</th>
-      </tr>
-    </thead>
-    <tbody id="tbody"></tbody>
-  </table>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+    <span id="resultCount" style="font-size:13px;color:#6b7280"></span>
+    <label style="font-size:13px;color:#6b7280">
+      Tampilkan:
+      <select id="pageSizeSelect" onchange="onPageSizeChange()" style="padding:4px 8px;border-radius:6px;border:1px solid #d1d5db;margin-left:4px">
+        <option value="20">20</option>
+        <option value="50">50</option>
+        <option value="100">100</option>
+        <option value="999999">Semua</option>
+      </select>
+    </label>
+  </div>
+
+  <div style="max-height:65vh;overflow-y:auto;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.06)">
+    <table style="box-shadow:none;border-radius:0">
+      <thead style="position:sticky;top:0;z-index:5">
+        <tr>
+          <th class="sortable" data-field="nama_account">Nama Account</th>
+          <th class="sortable" data-field="device_name">Device</th>
+          <th class="sortable" data-field="no_hp">No HP</th>
+          <th class="sortable" data-field="imei">IMEI</th>
+          <th class="sortable" data-field="terakhir_diisi">Terakhir Diisi</th>
+          <th class="sortable" data-field="akan_habis">Akan Habis</th>
+          <th class="sortable" data-field="jumlah_diisi">Jumlah Diisi</th>
+          <th class="sortable" data-field="setahun_saat">Jatuh Tempo Tahunan</th>
+          <th>Keterangan</th>
+          <th>Aksi</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+
+  <div id="pagination" style="display:flex;justify-content:center;align-items:center;gap:10px;margin-top:14px">
+    <button class="action" style="background:#6b7280" onclick="goToPage(currentPage - 1)">‹ Sebelumnya</button>
+    <span id="pageInfo" style="font-size:13px;color:#374151"></span>
+    <button class="action" style="background:#6b7280" onclick="goToPage(currentPage + 1)">Berikutnya ›</button>
+  </div>
 </div>
 
 <script>
@@ -163,6 +214,8 @@ let currentTab = 'all';
 let allDevices = [], dueFill = [], dueBilling = [];
 let sortField = 'nama_account';
 let sortDir = 'asc'; // 'asc' | 'desc'
+let currentPage = 1;
+let pageSize = 20;
 
 document.querySelectorAll('th.sortable').forEach(th => {
   th.style.cursor = 'pointer';
@@ -175,6 +228,7 @@ document.querySelectorAll('th.sortable').forEach(th => {
       sortField = field;
       sortDir = 'asc';
     }
+    currentPage = 1;
     render();
   });
 });
@@ -206,7 +260,19 @@ function renderSummary() {
 
 function switchTab(tab) {
   currentTab = tab;
+  currentPage = 1;
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  render();
+}
+
+function onPageSizeChange() {
+  pageSize = parseInt(document.getElementById('pageSizeSelect').value, 10);
+  currentPage = 1;
+  render();
+}
+
+function goToPage(page) {
+  currentPage = page;
   render();
 }
 
@@ -274,15 +340,30 @@ function render() {
   data = applySearch(data);
   data = applySort(data);
 
+  const totalItems = data.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  if (currentPage > totalPages) currentPage = totalPages;
+  if (currentPage < 1) currentPage = 1;
+
+  const startIdx = (currentPage - 1) * pageSize;
+  const pageData = data.slice(startIdx, startIdx + pageSize);
+
+  document.getElementById('resultCount').textContent =
+    totalItems === 0 ? '' : `Menampilkan ${startIdx + 1}-${Math.min(startIdx + pageSize, totalItems)} dari ${totalItems} data`;
+  document.getElementById('pageInfo').textContent = `Halaman ${currentPage} dari ${totalPages}`;
+  document.querySelectorAll('#pagination button')[0].disabled = currentPage <= 1;
+  document.querySelectorAll('#pagination button')[1].disabled = currentPage >= totalPages;
+  document.getElementById('pagination').style.display = totalItems === 0 ? 'none' : 'flex';
+
   const dueFillIds = new Set(dueFill.map(d => d.id));
   const dueBillIds = new Set(dueBilling.map(d => d.id));
 
-  if (data.length === 0) {
+  if (pageData.length === 0) {
     document.getElementById('tbody').innerHTML = `<tr><td colspan="10" style="text-align:center;color:#9ca3af;padding:24px">Tidak ada data yang cocok.</td></tr>`;
     return;
   }
 
-  document.getElementById('tbody').innerHTML = data.map(d => `
+  document.getElementById('tbody').innerHTML = pageData.map(d => `
     <tr>
       <td>${d.nama_account}</td>
       <td>${d.device_name || '-'}</td>
@@ -358,9 +439,34 @@ function attachDateAutoFormat(id) {
     if (digits.length > 4) out = digits.slice(0, 2) + '/' + digits.slice(2, 4) + '/' + digits.slice(4);
     else if (digits.length > 2) out = digits.slice(0, 2) + '/' + digits.slice(2);
     el.value = out;
+
+    // Ikut update kalender tersembunyi biar posisinya nyambung kalau nanti diklik
+    const iso = toISODate(out);
+    const nativeInput = document.getElementById(id + '_native');
+    if (nativeInput) nativeInput.value = iso || '';
   });
 }
 DATE_FIELD_IDS.forEach(attachDateAutoFormat);
+
+// Hubungkan tombol kalender (input date tersembunyi) ke kolom teks dd/mm/yyyy.
+// Trik: input date asli diposisikan transparan tepat di atas tombol 📅, jadi klik
+// tombol = klik input date asli (kalender bawaan browser tetap muncul & berfungsi
+// normal), tapi yang kita pakai cuma nilainya (selalu format ISO yyyy-mm-dd apapun
+// locale browsernya), lalu kita tampilkan ke kolom teks sebagai dd/mm/yyyy.
+DATE_FIELD_IDS.forEach((fid) => {
+  const nativeInput = document.getElementById(fid + '_native');
+  const textInput = document.getElementById(fid);
+  nativeInput.addEventListener('change', () => {
+    textInput.value = toDisplayDate(nativeInput.value);
+  });
+});
+
+function syncNativeDateInputs() {
+  DATE_FIELD_IDS.forEach((fid) => {
+    const iso = toISODate(document.getElementById(fid).value);
+    document.getElementById(fid + '_native').value = iso || '';
+  });
+}
 
 function valOrNull(id) {
   const v = document.getElementById(id).value.trim();
@@ -393,6 +499,8 @@ async function openDeviceModal(id = null) {
   } else {
     document.getElementById('deviceModalTitle').textContent = 'Tambah Customer Baru';
   }
+
+  syncNativeDateInputs();
 
   const modal = document.getElementById('deviceModal');
   modal.classList.remove('hidden');

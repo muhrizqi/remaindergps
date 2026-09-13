@@ -94,19 +94,19 @@
         </div>
         <div>
           <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Pertama Diisi</label>
-          <input id="f_pertama_diisi" type="date" style="width:100%;padding:8px;border-radius:6px;border:1px solid #d1d5db">
+          <input id="f_pertama_diisi" type="text" placeholder="dd/mm/yyyy" maxlength="10" style="width:100%;padding:8px;border-radius:6px;border:1px solid #d1d5db">
         </div>
         <div>
           <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Bayar 1 Tahun</label>
-          <input id="f_bayar_1_tahun" type="date" style="width:100%;padding:8px;border-radius:6px;border:1px solid #d1d5db">
+          <input id="f_bayar_1_tahun" type="text" placeholder="dd/mm/yyyy" maxlength="10" style="width:100%;padding:8px;border-radius:6px;border:1px solid #d1d5db">
         </div>
         <div>
           <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Setahun Saat (jatuh tempo)</label>
-          <input id="f_setahun_saat" type="date" style="width:100%;padding:8px;border-radius:6px;border:1px solid #d1d5db">
+          <input id="f_setahun_saat" type="text" placeholder="dd/mm/yyyy" maxlength="10" style="width:100%;padding:8px;border-radius:6px;border:1px solid #d1d5db">
         </div>
         <div>
           <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Terakhir Diisi</label>
-          <input id="f_terakhir_diisi" type="date" style="width:100%;padding:8px;border-radius:6px;border:1px solid #d1d5db">
+          <input id="f_terakhir_diisi" type="text" placeholder="dd/mm/yyyy" maxlength="10" style="width:100%;padding:8px;border-radius:6px;border:1px solid #d1d5db">
         </div>
         <div>
           <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Jam Diisi</label>
@@ -114,7 +114,7 @@
         </div>
         <div>
           <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Akan Habis</label>
-          <input id="f_akan_habis" type="date" style="width:100%;padding:8px;border-radius:6px;border:1px solid #d1d5db">
+          <input id="f_akan_habis" type="text" placeholder="dd/mm/yyyy" maxlength="10" style="width:100%;padding:8px;border-radius:6px;border:1px solid #d1d5db">
         </div>
       </div>
       <div style="margin-top:12px">
@@ -322,6 +322,45 @@ const DEVICE_FORM_IDS = [
   'f_pertama_diisi', 'f_bayar_1_tahun', 'f_setahun_saat', 'f_terakhir_diisi',
   'f_jam_diisi', 'f_akan_habis', 'f_keterangan',
 ];
+const DATE_FIELD_IDS = ['f_pertama_diisi', 'f_bayar_1_tahun', 'f_setahun_saat', 'f_terakhir_diisi', 'f_akan_habis'];
+
+// ISO (yyyy-mm-dd, dari database/API) -> tampilan dd/mm/yyyy di form,
+// supaya sama persis dengan format yang dipakai di tabel dashboard
+function toDisplayDate(iso) {
+  if (!iso) return '';
+  const s = String(iso).slice(0, 10);
+  const parts = s.split('-');
+  if (parts.length !== 3) return '';
+  const [y, m, d] = parts;
+  return `${d}/${m}/${y}`;
+}
+
+// dd/mm/yyyy (dari form) -> ISO yyyy-mm-dd (buat dikirim ke API/database)
+// return undefined kalau formatnya salah, null kalau memang dikosongkan
+function toISODate(display) {
+  const v = (display || '').trim();
+  if (v === '') return null;
+  const m = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!m) return undefined; // invalid
+  const [, d, mo, y] = m;
+  const day = parseInt(d, 10), month = parseInt(mo, 10);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return undefined;
+  return `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`;
+}
+
+// Auto-sisipkan "/" waktu ngetik angka, biar tetap gampang diisi walau
+// bukan input type=date bawaan browser
+function attachDateAutoFormat(id) {
+  const el = document.getElementById(id);
+  el.addEventListener('input', () => {
+    let digits = el.value.replace(/\D/g, '').slice(0, 8); // ddmmyyyy
+    let out = digits;
+    if (digits.length > 4) out = digits.slice(0, 2) + '/' + digits.slice(2, 4) + '/' + digits.slice(4);
+    else if (digits.length > 2) out = digits.slice(0, 2) + '/' + digits.slice(2);
+    el.value = out;
+  });
+}
+DATE_FIELD_IDS.forEach(attachDateAutoFormat);
 
 function valOrNull(id) {
   const v = document.getElementById(id).value.trim();
@@ -343,12 +382,12 @@ async function openDeviceModal(id = null) {
     document.getElementById('f_device_name').value = d.device_name || '';
     document.getElementById('f_imei').value = d.imei || '';
     document.getElementById('f_no_hp').value = d.no_hp || '';
-    document.getElementById('f_pertama_diisi').value = d.pertama_diisi ? String(d.pertama_diisi).slice(0, 10) : '';
-    document.getElementById('f_bayar_1_tahun').value = d.bayar_1_tahun ? String(d.bayar_1_tahun).slice(0, 10) : '';
-    document.getElementById('f_setahun_saat').value = d.setahun_saat ? String(d.setahun_saat).slice(0, 10) : '';
-    document.getElementById('f_terakhir_diisi').value = d.terakhir_diisi ? String(d.terakhir_diisi).slice(0, 10) : '';
+    document.getElementById('f_pertama_diisi').value = toDisplayDate(d.pertama_diisi);
+    document.getElementById('f_bayar_1_tahun').value = toDisplayDate(d.bayar_1_tahun);
+    document.getElementById('f_setahun_saat').value = toDisplayDate(d.setahun_saat);
+    document.getElementById('f_terakhir_diisi').value = toDisplayDate(d.terakhir_diisi);
     document.getElementById('f_jam_diisi').value = d.jam_diisi ? String(d.jam_diisi).slice(0, 5) : '';
-    document.getElementById('f_akan_habis').value = d.akan_habis ? String(d.akan_habis).slice(0, 10) : '';
+    document.getElementById('f_akan_habis').value = toDisplayDate(d.akan_habis);
     document.getElementById('f_jumlah_diisi').value = d.jumlah_diisi ?? 0;
     document.getElementById('f_keterangan').value = keteranganText(d.keterangan_json);
   } else {
@@ -376,18 +415,30 @@ async function saveDevice() {
     return;
   }
 
+  // Validasi & konversi semua field tanggal (dd/mm/yyyy -> ISO)
+  const dateValues = {};
+  for (const fid of DATE_FIELD_IDS) {
+    const iso = toISODate(document.getElementById(fid).value);
+    if (iso === undefined) {
+      document.getElementById('deviceModalStatus').textContent =
+        `❌ Format tanggal tidak valid di field "${fid.replace('f_', '').replace(/_/g, ' ')}". Pakai format dd/mm/yyyy.`;
+      return;
+    }
+    dateValues[fid] = iso;
+  }
+
   const payload = {
     nama_account: namaAccount,
     kontak_pemilik: valOrNull('f_kontak_pemilik'),
     device_name: valOrNull('f_device_name'),
     imei: valOrNull('f_imei'),
     no_hp: noHp,
-    pertama_diisi: valOrNull('f_pertama_diisi'),
-    bayar_1_tahun: valOrNull('f_bayar_1_tahun'),
-    setahun_saat: valOrNull('f_setahun_saat'),
-    terakhir_diisi: valOrNull('f_terakhir_diisi'),
+    pertama_diisi: dateValues.f_pertama_diisi,
+    bayar_1_tahun: dateValues.f_bayar_1_tahun,
+    setahun_saat: dateValues.f_setahun_saat,
+    terakhir_diisi: dateValues.f_terakhir_diisi,
     jam_diisi: valOrNull('f_jam_diisi'),
-    akan_habis: valOrNull('f_akan_habis'),
+    akan_habis: dateValues.f_akan_habis,
     jumlah_diisi: parseInt(document.getElementById('f_jumlah_diisi').value, 10) || 0,
     keterangan_json: { raw: document.getElementById('f_keterangan').value.trim(), parsed: {} },
   };

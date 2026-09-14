@@ -137,3 +137,11 @@ Selain import dari Excel, kamu bisa tambah/edit customer langsung dari dashboard
 - Validasi otomatis: Nama Account & No HP wajib diisi, dan kalau IMEI yang
   dimasukkan sudah dipakai device lain, sistem akan menolak dengan pesan
   yang jelas (bukan error teknis).
+- **Auto-isi saat tambah customer baru**: begitu kamu isi tanggal "Bayar 1
+  Tahun", field lain otomatis terisi mengikuti:
+  - Setahun Saat (jatuh tempo) = Bayar 1 Tahun + 1 tahun
+  - Terakhir Diisi = sama dengan tanggal Bayar 1 Tahun
+  - Akan Habis = Terakhir Diisi + `FILL_CYCLE_DAYS` (dari environment variable)
+  - Jam Diisi = jam saat itu juga
+  Auto-isi ini hanya berlaku waktu **tambah baru**, tidak menimpa data yang
+  sudah ada waktu **edit** customer.

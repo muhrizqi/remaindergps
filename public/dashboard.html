@@ -216,6 +216,7 @@ let sortField = 'nama_account';
 let sortDir = 'asc'; // 'asc' | 'desc'
 let currentPage = 1;
 let pageSize = 20;
+let fillCycleDays = 28; // fallback, akan diganti sesuai env server setelah loadConfig()
 
 document.querySelectorAll('th.sortable').forEach(th => {
   th.style.cursor = 'pointer';
@@ -238,6 +239,15 @@ function updateSortIndicators() {
     const base = th.textContent.replace(/ ▲| ▼/g, '');
     th.textContent = base + (th.dataset.field === sortField ? (sortDir === 'asc' ? ' ▲' : ' ▼') : '');
   });
+}
+
+async function loadConfig() {
+  try {
+    const cfg = await fetch('/api/config').then(r => r.json());
+    fillCycleDays = cfg.fillCycleDays || 28;
+  } catch (e) {
+    console.warn('Gagal memuat config, pakai default 28 hari:', e.message);
+  }
 }
 
 async function loadAll() {
@@ -458,6 +468,7 @@ DATE_FIELD_IDS.forEach((fid) => {
   const textInput = document.getElementById(fid);
   nativeInput.addEventListener('change', () => {
     textInput.value = toDisplayDate(nativeInput.value);
+    if (fid === 'f_bayar_1_tahun') recalcFromBayar1Tahun();
   });
 });
 
@@ -467,6 +478,42 @@ function syncNativeDateInputs() {
     document.getElementById(fid + '_native').value = iso || '';
   });
 }
+
+function addDaysISO(iso, days) {
+  const d = new Date(iso + 'T00:00:00');
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function addYearsISO(iso, years) {
+  const d = new Date(iso + 'T00:00:00');
+  d.setFullYear(d.getFullYear() + years);
+  return d.toISOString().slice(0, 10);
+}
+
+// Waktu tambah customer BARU, sekali "Bayar 1 Tahun" diisi (ngetik manual atau
+// lewat kalender), otomatis hitung: Setahun Saat (+1 tahun), Terakhir Diisi
+// (sama dengan tanggal bayar), Akan Habis (+ FILL_CYCLE_DAYS dari env), dan
+// Jam Diisi (jam saat ini). Cuma jalan waktu mode tambah baru, supaya tidak
+// menimpa data yang sudah ada waktu mode edit.
+function recalcFromBayar1Tahun() {
+  const isAddMode = document.getElementById('deviceId').value === '';
+  if (!isAddMode) return;
+
+  const bayarIso = toISODate(document.getElementById('f_bayar_1_tahun').value);
+  if (!bayarIso) return; // belum lengkap/valid, jangan dihitung dulu
+
+  document.getElementById('f_setahun_saat').value = toDisplayDate(addYearsISO(bayarIso, 1));
+  document.getElementById('f_terakhir_diisi').value = toDisplayDate(bayarIso);
+  document.getElementById('f_akan_habis').value = toDisplayDate(addDaysISO(bayarIso, fillCycleDays));
+
+  const now = new Date();
+  document.getElementById('f_jam_diisi').value =
+    `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+  syncNativeDateInputs();
+}
+document.getElementById('f_bayar_1_tahun').addEventListener('input', recalcFromBayar1Tahun);
 
 function valOrNull(id) {
   const v = document.getElementById(id).value.trim();
@@ -651,6 +698,7 @@ async function doImport() {
   loadAll();
 }
 
+loadConfig();
 loadAll();
 </script>
 </body>

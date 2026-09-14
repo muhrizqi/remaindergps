@@ -18,6 +18,13 @@ const upload = multer({ dest: os.tmpdir() });
 
 // Cek nama-nama sheet dalam file Excel yang baru diupload (dipakai dashboard
 // buat nampilin pilihan sheet sebelum user klik "Import")
+// Config yang perlu dibaca dashboard (frontend tidak punya akses langsung ke env server)
+router.get('/config', (req, res) => {
+  res.json({
+    fillCycleDays: parseInt(process.env.FILL_CYCLE_DAYS || '28', 10),
+  });
+});
+
 router.post('/import-excel/sheets', upload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'File tidak ditemukan' });
   try {

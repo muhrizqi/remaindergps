@@ -1,4 +1,8 @@
-const { Pool } = require('pg');
+const { Pool, types } = require('pg');
+
+// Kolom DATE dikembalikan apa adanya sebagai teks 'YYYY-MM-DD' (bukan objek Date),
+// supaya tanggal tidak bergeser sehari karena beda zona waktu server/browser.
+types.setTypeParser(1082, (v) => v);
 const fs = require('fs');
 const path = require('path');
 

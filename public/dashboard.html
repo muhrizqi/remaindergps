@@ -25,6 +25,8 @@
   .badge.due{background:#fee2e2;color:var(--red)}
   .badge.ok{background:#dcfce7;color:var(--green)}
   .badge.warn{background:#fef3c7;color:var(--amber)}
+  .badge.off{background:#e5e7eb;color:#6b7280}
+  tr.inactive td{color:#9ca3af;background:#fafafa}
   button.action{padding:6px 10px;border-radius:6px;border:none;background:var(--green);color:#fff;font-size:12px;cursor:pointer}
   button.secondary{background:var(--amber)}
   .refresh{float:right;padding:8px 14px;border-radius:8px;border:none;background:#2563eb;color:#fff;cursor:pointer;font-size:13px}
@@ -153,6 +155,13 @@
         </div>
       </div>
       <div style="margin-top:12px">
+        <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Status Langganan</label>
+        <select id="f_status" style="width:100%;padding:8px;border-radius:6px;border:1px solid #d1d5db">
+          <option value="active">Aktif (ikut pengingat WhatsApp)</option>
+          <option value="nonactive">Berhenti langganan (tidak ikut pengingat)</option>
+        </select>
+      </div>
+      <div style="margin-top:12px">
         <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Keterangan</label>
         <textarea id="f_keterangan" rows="2" style="width:100%;padding:8px;border-radius:6px;border:1px solid #d1d5db;font-family:inherit"></textarea>
       </div>
@@ -165,9 +174,10 @@
   </div>
 
   <div class="tabs">
-    <div class="tab active" data-tab="all" onclick="switchTab('all')">Semua Device</div>
+    <div class="tab active" data-tab="all" onclick="switchTab('all')">Aktif</div>
     <div class="tab" data-tab="fill" onclick="switchTab('fill')">Perlu Isi Hari Ini</div>
     <div class="tab" data-tab="billing" onclick="switchTab('billing')">Perlu Ditagih</div>
+    <div class="tab" data-tab="inactive" onclick="switchTab('inactive')">Berhenti Langganan <span id="inactiveCount"></span></div>
   </div>
 
   <input type="text" id="searchBox" placeholder="🔍 Cari nama account, device, no HP, atau IMEI..."
@@ -267,7 +277,8 @@ async function loadAll() {
 
 function renderSummary() {
   document.getElementById('summary').innerHTML = `
-    <div class="stat"><div class="num">${allDevices.length}</div><div class="label">Total Device</div></div>
+    <div class="stat"><div class="num">${allDevices.filter(d => d.status !== 'nonactive').length}</div><div class="label">Device Aktif</div></div>
+    <div class="stat"><div class="num" style="color:#6b7280">${allDevices.filter(d => d.status === 'nonactive').length}</div><div class="label">Berhenti Langganan</div></div>
     <div class="stat"><div class="num" style="color:var(--red)">${dueFill.length}</div><div class="label">Perlu Isi Hari Ini</div></div>
     <div class="stat"><div class="num" style="color:var(--amber)">${dueBilling.length}</div><div class="label">Perlu Ditagih</div></div>
   `;
@@ -291,7 +302,10 @@ function goToPage(page) {
   render();
 }
 
-function fmt(d) { return d ? new Date(d).toLocaleDateString('id-ID') : '-'; }
+function fmt(d) {
+  const m = String(d || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : '-';
+}
 
 function keteranganText(k) {
   if (!k) return '';
@@ -351,7 +365,13 @@ function applySort(data) {
 
 function render() {
   updateSortIndicators();
-  let data = currentTab === 'all' ? allDevices : currentTab === 'fill' ? dueFill : dueBilling;
+  const activeDevices = allDevices.filter(d => d.status !== 'nonactive');
+  const inactiveDevices = allDevices.filter(d => d.status === 'nonactive');
+  document.getElementById('inactiveCount').textContent = inactiveDevices.length ? `(${inactiveDevices.length})` : '';
+  let data = currentTab === 'all' ? activeDevices
+    : currentTab === 'fill' ? dueFill
+    : currentTab === 'billing' ? dueBilling
+    : inactiveDevices;
   data = applySearch(data);
   data = applySort(data);
 
@@ -378,26 +398,35 @@ function render() {
     return;
   }
 
-  document.getElementById('tbody').innerHTML = pageData.map(d => `
-    <tr>
-      <td>${d.nama_account}</td>
+  document.getElementById('tbody').innerHTML = pageData.map(d => {
+    const off = d.status === 'nonactive';
+    return `
+    <tr class="${off ? 'inactive' : ''}">
+      <td>${d.nama_account} ${off ? '<span class="badge off">Berhenti</span>' : ''}</td>
       <td>${d.device_name || '-'}</td>
       <td>${d.no_hp}</td>
       <td>${d.imei || '-'}</td>
       <td>${fmt(d.terakhir_diisi)}</td>
-      <td>${fmt(d.akan_habis)} ${dueFillIds.has(d.id) ? '<span class="badge due">Jatuh tempo</span>' : ''}</td>
+      <td>${fmt(d.akan_habis)} ${!off && dueFillIds.has(d.id) ? '<span class="badge due">Jatuh tempo</span>' : ''}</td>
       <td>${d.jumlah_diisi}</td>
-      <td>${fmt(d.setahun_saat)} ${dueBillIds.has(d.id) ? '<span class="badge warn">Perlu tagih</span>' : ''}</td>
+      <td>${fmt(d.setahun_saat)} ${!off && dueBillIds.has(d.id) ? '<span class="badge warn">Perlu tagih</span>' : ''}</td>
       <td class="keterangan-cell" style="max-width:180px;cursor:pointer" title="Klik untuk edit" onclick="editKeterangan(${d.id}, ${JSON.stringify(keteranganText(d.keterangan_json)).replace(/"/g, '&quot;')})">
         <span style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(keteranganText(d.keterangan_json)) || '<span style=\"color:#9ca3af\">+ tambah</span>'}</span>
       </td>
       <td>
+        ${off ? `
+        <button class="action" onclick="reactivate(${d.id})">Aktifkan Kembali</button>
+        <button class="action" style="background:#2563eb" onclick="openDeviceModal(${d.id})">Edit</button>
+        ` : `
         <button class="action" onclick="markFilled(${d.id})">Tandai Diisi</button>
         <button class="action secondary" onclick="markPaid(${d.id})">Tandai Bayar</button>
         <button class="action" style="background:#2563eb" onclick="openDeviceModal(${d.id})">Edit</button>
+        <button class="action" style="background:#6b7280" onclick="stopSubscription(${d.id})">Berhenti</button>
+        `}
       </td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
 }
 
 async function editKeterangan(id, currentText) {
@@ -484,16 +513,15 @@ function syncNativeDateInputs() {
   });
 }
 
+// Hitung tanggal murni di UTC supaya tidak geser sehari di browser zona waktu mana pun
 function addDaysISO(iso, days) {
-  const d = new Date(iso + 'T00:00:00');
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
 }
 
 function addYearsISO(iso, years) {
-  const d = new Date(iso + 'T00:00:00');
-  d.setFullYear(d.getFullYear() + years);
-  return d.toISOString().slice(0, 10);
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(Date.UTC(y + years, m - 1, d)).toISOString().slice(0, 10);
 }
 
 // Waktu tambah customer BARU, sekali "Bayar 1 Tahun" diisi (ngetik manual atau
@@ -580,6 +608,7 @@ async function openDeviceModal(id = null) {
   document.getElementById('deviceModalStatus').textContent = '';
   DEVICE_FORM_IDS.forEach(fid => document.getElementById(fid).value = '');
   document.getElementById('f_jumlah_diisi').value = 0;
+  document.getElementById('f_status').value = 'active';
   clearFieldWarnings();
 
   if (id) {
@@ -598,6 +627,7 @@ async function openDeviceModal(id = null) {
     document.getElementById('f_jam_diisi').value = d.jam_diisi ? String(d.jam_diisi).slice(0, 5) : '';
     document.getElementById('f_akan_habis').value = toDisplayDate(d.akan_habis);
     document.getElementById('f_jumlah_diisi').value = d.jumlah_diisi ?? 0;
+    document.getElementById('f_status').value = d.status === 'nonactive' ? 'nonactive' : 'active';
     document.getElementById('f_keterangan').value = keteranganText(d.keterangan_json);
   } else {
     document.getElementById('deviceModalTitle').textContent = 'Tambah Customer Baru';
@@ -652,6 +682,7 @@ async function saveDevice() {
     akan_habis: dateValues.f_akan_habis,
     jumlah_diisi: parseInt(document.getElementById('f_jumlah_diisi').value, 10) || 0,
     keterangan_json: { raw: document.getElementById('f_keterangan').value.trim(), parsed: {} },
+    status: document.getElementById('f_status').value,
   };
 
   document.getElementById('deviceModalStatus').textContent = 'Memeriksa No HP & IMEI...';
@@ -680,12 +711,49 @@ async function saveDevice() {
 }
 
 async function markFilled(id) {
-  await fetch(`/api/devices/${id}/mark-filled`, { method: 'POST' });
+  const res = await fetch(`/api/devices/${id}/mark-filled`, { method: 'POST' });
+  if (!res.ok) alert((await res.json().catch(() => ({}))).error || 'Gagal menandai.');
+  loadAll();
+}
+
+// Tandai customer berhenti langganan: tidak ikut pengingat isi pulsa maupun tagihan tahunan.
+// Datanya tetap tersimpan (tab "Berhenti Langganan") dan bisa diaktifkan kembali kapan saja.
+async function stopSubscription(id) {
+  const d = allDevices.find(x => x.id === id);
+  const nama = d ? `${d.nama_account}${d.device_name ? ' (' + d.device_name + ')' : ''}` : 'customer ini';
+  const note = prompt(
+    `Tandai ${nama} berhenti berlangganan?\n\nTidak akan ikut pengingat WhatsApp lagi. Data tetap tersimpan.\n\nCatatan alasan (boleh dikosongkan):`,
+    ''
+  );
+  if (note === null) return; // batal
+  const body = { status: 'nonactive' };
+  const today = toDisplayDate(new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' }));
+  const prev = d ? keteranganText(d.keterangan_json) : '';
+  const stamp = `Berhenti ${today}${note.trim() ? ': ' + note.trim() : ''}`;
+  body.keterangan_json = { raw: prev ? `${prev} | ${stamp}` : stamp, parsed: {} };
+  const res = await fetch(`/api/devices/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) alert((await res.json().catch(() => ({}))).error || 'Gagal menyimpan.');
+  loadAll();
+}
+
+async function reactivate(id) {
+  if (!confirm('Aktifkan kembali customer ini? Ia akan ikut pengingat WhatsApp lagi sesuai tanggal Akan Habis / Jatuh Tempo di datanya (periksa lewat Edit kalau perlu).')) return;
+  const res = await fetch(`/api/devices/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: 'active' }),
+  });
+  if (!res.ok) alert((await res.json().catch(() => ({}))).error || 'Gagal mengaktifkan.');
   loadAll();
 }
 async function markPaid(id) {
   if (!confirm('Tandai device ini sudah bayar perpanjangan tahunan? Siklus akan direset.')) return;
-  await fetch(`/api/devices/${id}/mark-paid`, { method: 'POST' });
+  const res = await fetch(`/api/devices/${id}/mark-paid`, { method: 'POST' });
+  if (!res.ok) alert((await res.json().catch(() => ({}))).error || 'Gagal menandai.');
   loadAll();
 }
 

@@ -19,6 +19,10 @@ router.get('/u/:token', async (req, res) => {
   const device = await getDeviceById(payload.deviceId);
   if (!device) return res.status(404).send(renderPage('Device tidak ditemukan.', true));
 
+  if (device.status !== 'active') {
+    return res.send(renderPage(`${device.nama_account} sudah berhenti berlangganan (nonaktif), tidak perlu diproses.`, true));
+  }
+
   const actionLabel = payload.action === 'fill' ? 'Tandai sudah isi pulsa' : 'Tandai sudah bayar perpanjangan';
 
   res.send(`
@@ -57,6 +61,10 @@ router.post('/u/:token/confirm', async (req, res) => {
 
   const device = await getDeviceById(payload.deviceId);
   if (!device) return res.status(404).send(renderPage('Device tidak ditemukan.', true));
+
+  if (device.status !== 'active') {
+    return res.send(renderPage(`${device.nama_account} sudah berhenti berlangganan (nonaktif), tidak perlu diproses.`, true));
+  }
 
   if (payload.action === 'fill') {
     await markFilled(payload.deviceId);

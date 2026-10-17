@@ -1,4 +1,5 @@
 const { pool, SQL_NORM_PHONE } = require('./db');
+const { todayStr, nowTimeStr } = require('./time');
 
 // Samakan format No HP supaya "0812-3456", "+62 812 3456", dan "628123456" dianggap sama.
 // Harus sama dengan SQL_NORM_PHONE di db.js.
@@ -67,10 +68,6 @@ function describeDevice(d) {
 const FILL_CYCLE_DAYS = parseInt(process.env.FILL_CYCLE_DAYS || '28', 10);
 const MAX_FILL_COUNT = parseInt(process.env.MAX_FILL_COUNT || '13', 10);
 
-function todayStr() {
-  return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-}
-
 // Device yang harus diisi pulsa hari ini: akan_habis <= hari ini, status active
 async function getDevicesDueForFillToday() {
   const { rows } = await pool.query(
@@ -98,8 +95,7 @@ async function getDevicesDueForBillingToday() {
 
 // Tandai device sudah diisi pulsa hari ini
 async function markFilled(deviceId) {
-  const now = new Date();
-  const time = now.toTimeString().slice(0, 8); // HH:MM:SS
+  const time = nowTimeStr(); // HH:MM:SS zona waktu bisnis
   const today = todayStr();
 
   const { rows } = await pool.query(
@@ -109,7 +105,7 @@ async function markFilled(deviceId) {
          jumlah_diisi = jumlah_diisi + 1,
          akan_habis = ($1::date + ($3 || ' days')::interval)::date,
          updated_at = now()
-     WHERE id = $4
+     WHERE id = $4 AND status = 'active'
      RETURNING *`,
     [today, time, FILL_CYCLE_DAYS, deviceId]
   );
@@ -134,7 +130,7 @@ async function markRenewalPaid(deviceId) {
          setahun_saat = ($1::date + interval '1 year')::date,
          jumlah_diisi = 1,
          updated_at = now()
-     WHERE id = $2
+     WHERE id = $2 AND status = 'active'
      RETURNING *`,
     [today, deviceId]
   );
@@ -174,11 +170,14 @@ async function markNotified(deviceId, notifType) {
 // Cek apakah semua device dalam daftar ID ini sudah diisi HARI INI
 async function areAllFilledToday(deviceIds) {
   if (!deviceIds || deviceIds.length === 0) return false;
+  // Hanya device aktif yang dihitung; yang sudah berhenti langganan diabaikan
   const { rows } = await pool.query(
-    `SELECT count(*)::int AS cnt FROM devices WHERE id = ANY($1::int[]) AND terakhir_diisi = $2`,
+    `SELECT count(*)::int AS total,
+            count(*) FILTER (WHERE terakhir_diisi = $2)::int AS done
+     FROM devices WHERE id = ANY($1::int[]) AND status = 'active'`,
     [deviceIds, todayStr()]
   );
-  return rows[0].cnt >= deviceIds.length;
+  return rows[0].total > 0 && rows[0].done >= rows[0].total;
 }
 
 // Coba catat "event harian" (misal ucapan terima kasih) - hanya berhasil sekali per hari.

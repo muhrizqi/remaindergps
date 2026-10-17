@@ -14,7 +14,12 @@ const AUTO_BILL_CUSTOMER = process.env.AUTO_BILL_CUSTOMER === 'true';
 
 function fmtDate(d) {
   if (!d) return '-';
-  return new Date(d).toLocaleDateString('id-ID');
+  // d = 'YYYY-MM-DD' (kolom DATE) atau Date (waktu sekarang)
+  if (typeof d === 'string') {
+    const m = d.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+  }
+  return new Date(d).toLocaleDateString('id-ID', { timeZone: process.env.TIMEZONE || 'Asia/Jakarta' });
 }
 
 async function runDailyCheck() {

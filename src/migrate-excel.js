@@ -28,6 +28,17 @@ function excelDateToISO(val) {
   return null;
 }
 
+// Kolom "Status": Aktif/Nonaktif (juga active/nonactive, berhenti, dst).
+// Kosong / tidak ada kolom -> null (artinya: jangan ubah status yang sudah ada).
+function parseStatus(val) {
+  if (val == null) return null;
+  const s = String(val).trim().toLowerCase();
+  if (!s) return null;
+  if (['nonaktif', 'non aktif', 'non-aktif', 'nonactive', 'inactive', 'berhenti', 'tidak aktif'].includes(s)) return 'nonactive';
+  if (['aktif', 'active'].includes(s)) return 'active';
+  return null;
+}
+
 function excelTimeToStr(val) {
   if (!val) return null;
   if (val instanceof Date) {
@@ -161,6 +172,7 @@ async function importFromExcel(filePath, sheetName = null) {
         excelDateToISO(r['akan habis']),
         parseInt(r['jumlah diisi'], 10) || 0,
         JSON.stringify(parseKeterangan(r['Keterangan'] || r['keterangan'])),
+        parseStatus(r['Status'] || r['status']),
       ];
 
       if (existing) {
@@ -169,8 +181,9 @@ async function importFromExcel(filePath, sheetName = null) {
              nama_account = $1, kontak_pemilik = $2, device_name = $3, imei = $4, no_hp = $5,
              pertama_diisi = $6, bayar_1_tahun = $7, setahun_saat = $8, terakhir_diisi = $9,
              jam_diisi = $10, akan_habis = $11, jumlah_diisi = $12, keterangan_json = $13,
+             status = COALESCE($14, status),
              updated_at = now()
-           WHERE id = $14`,
+           WHERE id = $15`,
           [...values, existing.id]
         );
         updated++;
@@ -179,8 +192,8 @@ async function importFromExcel(filePath, sheetName = null) {
           `INSERT INTO devices
             (nama_account, kontak_pemilik, device_name, imei, no_hp,
              pertama_diisi, bayar_1_tahun, setahun_saat, terakhir_diisi,
-             jam_diisi, akan_habis, jumlah_diisi, keterangan_json)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+             jam_diisi, akan_habis, jumlah_diisi, keterangan_json, status)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,COALESCE($14,'active'))`,
           values
         );
         inserted++;

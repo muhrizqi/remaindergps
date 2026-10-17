@@ -16,6 +16,7 @@ const {
   describeDevice,
 } = require('../deviceService');
 const { runDailyCheck } = require('../cron');
+const { todayStr } = require('../time');
 
 // Cek No HP & IMEI terhadap device lain. Return null kalau aman, atau
 // { status: 409, field, error } kalau bentrok - dipakai bersama oleh tambah & edit.
@@ -93,7 +94,11 @@ router.get('/export-excel', async (req, res) => {
   const XLSX = require('xlsx');
   const { rows } = await pool.query('SELECT * FROM devices ORDER BY nama_account');
 
-  const fmtDate = (d) => (d ? new Date(d).toLocaleDateString('en-US') : ''); // M/D/YYYY, sama seperti format asal
+  // M/D/YYYY, sama seperti format asal (dari teks 'YYYY-MM-DD', tanpa konversi zona waktu)
+  const fmtDate = (d) => {
+    const m = String(d || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    return m ? `${parseInt(m[2], 10)}/${parseInt(m[3], 10)}/${m[1]}` : '';
+  };
   const fmtTime = (t) => (t ? String(t).slice(0, 5) : ''); // HH:MM
   const fmtKeterangan = (k) => {
     if (!k) return '';
@@ -127,19 +132,20 @@ router.get('/export-excel', async (req, res) => {
     'akan habis': fmtDate(d.akan_habis),
     'jumlah diisi': d.jumlah_diisi,
     Keterangan: fmtKeterangan(d.keterangan_json),
+    Status: d.status === 'nonactive' ? 'Nonaktif' : 'Aktif',
   }));
 
   const ws = XLSX.utils.json_to_sheet(exportRows);
   ws['!cols'] = [
     { wch: 5 }, { wch: 22 }, { wch: 15 }, { wch: 14 }, { wch: 18 }, { wch: 15 },
     { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 9 }, { wch: 12 },
-    { wch: 12 }, { wch: 40 },
+    { wch: 12 }, { wch: 40 }, { wch: 10 },
   ];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Data GPS Pulsa');
 
   const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-  const filename = `data-pulsa-gps-${new Date().toISOString().slice(0, 10)}.xlsx`;
+  const filename = `data-pulsa-gps-${todayStr()}.xlsx`;
 
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -249,6 +255,10 @@ router.patch('/devices/:id', async (req, res) => {
   const fields = Object.keys(body).filter((f) => ALLOWED_DEVICE_FIELDS.has(f));
   if (fields.length === 0) return res.status(400).json({ error: 'Tidak ada field valid untuk diupdate' });
 
+  if ('status' in body && !['active', 'nonactive'].includes(body.status)) {
+    return res.status(400).json({ error: "Status harus 'active' atau 'nonactive'." });
+  }
+
   // Rapikan IMEI (kosong -> NULL) dan No HP (tidak boleh dikosongkan)
   if ('imei' in body) body.imei = normalizeImei(body.imei);
   if ('no_hp' in body) {
@@ -299,8 +309,17 @@ router.get('/due/fill', async (req, res) => res.json(await getDevicesDueForFillT
 router.get('/due/billing', async (req, res) => res.json(await getDevicesDueForBillingToday()));
 
 // Tandai manual dari dashboard (tanpa link WA)
-router.post('/devices/:id/mark-filled', async (req, res) => res.json(await markFilled(req.params.id)));
-router.post('/devices/:id/mark-paid', async (req, res) => res.json(await markRenewalPaid(req.params.id)));
+const INACTIVE_MSG = 'Customer ini sudah berhenti berlangganan (nonaktif). Aktifkan kembali dulu lewat Edit.';
+router.post('/devices/:id/mark-filled', async (req, res) => {
+  const d = await markFilled(req.params.id);
+  if (!d) return res.status(409).json({ error: INACTIVE_MSG });
+  res.json(d);
+});
+router.post('/devices/:id/mark-paid', async (req, res) => {
+  const d = await markRenewalPaid(req.params.id);
+  if (!d) return res.status(409).json({ error: INACTIVE_MSG });
+  res.json(d);
+});
 
 // Trigger ulang pengecekan & kirim notifikasi WA manual (testing / kalau cron kelewat)
 router.post('/run-check', async (req, res) => {

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { verifyToken } = require('../token');
+const { todayStr: today } = require('../time');
 const { sendText } = require('../waha');
 const {
   getDevicesByIds,
@@ -12,7 +13,7 @@ const {
 const ADMIN_WA_NUMBER = process.env.ADMIN_WA_NUMBER;
 
 function renderBatchPage(token, devices) {
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = today();
   const items = devices
     .map((d) => {
       const done = d.terakhir_diisi && String(d.terakhir_diisi).slice(0, 10) === todayStr;
@@ -102,7 +103,8 @@ router.get('/batch/:token', async (req, res) => {
     return res.status(400).send('<p style="font-family:sans-serif;padding:24px;color:#dc2626">Link tidak valid.</p>');
   }
 
-  const devices = await getDevicesByIds(payload.deviceIds);
+  // Customer yang sudah berhenti berlangganan tidak ditampilkan
+  const devices = (await getDevicesByIds(payload.deviceIds)).filter((d) => d.status === 'active');
   res.send(renderBatchPage(req.params.token, devices));
 });
 
@@ -122,16 +124,20 @@ router.post('/batch/:token/mark/:deviceId', async (req, res) => {
     return res.status(403).json({ error: 'Device ini bukan bagian dari link ini.' });
   }
 
-  await markFilled(deviceId);
+  const updated = await markFilled(deviceId);
+  if (!updated) {
+    return res.status(409).json({ error: 'Customer ini sudah berhenti berlangganan (nonaktif).' });
+  }
 
   const allDone = await areAllFilledToday(payload.deviceIds);
   if (allDone) {
+    const activeCount = (await getDevicesByIds(payload.deviceIds)).filter((d) => d.status === 'active').length;
     const firstClaim = await tryClaimDailyEvent('fill_all_done_thank_you');
     if (firstClaim && ADMIN_WA_NUMBER) {
       try {
         await sendText(
           ADMIN_WA_NUMBER,
-          `🎉 Terima kasih! Semua ${payload.deviceIds.length} nomor sudah diisi pulsa hari ini.`
+          `🎉 Terima kasih! Semua ${activeCount} nomor sudah diisi pulsa hari ini.`
         );
       } catch (e) {
         console.error('Gagal kirim WA ucapan terima kasih:', e.message);

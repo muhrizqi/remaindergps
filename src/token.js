@@ -1,11 +1,13 @@
 const jwt = require('jsonwebtoken');
 
+const { todayStr, nowTimeStr } = require('./time');
+
 const SECRET = process.env.JWT_SECRET;
 
 function secondsUntilEndOfDay() {
-  const endOfDay = new Date();
-  endOfDay.setHours(23, 59, 59, 999);
-  return Math.floor((endOfDay.getTime() - Date.now()) / 1000) + 60;
+  // sampai akhir hari menurut zona waktu bisnis (bukan zona server)
+  const [h, m, sec] = nowTimeStr().split(':').map(Number);
+  return 86400 - (h * 3600 + m * 60 + sec) + 60;
 }
 
 /**
@@ -23,7 +25,7 @@ function makeDailyToken(deviceId, action) {
  */
 function makeBatchToken(deviceIds) {
   return jwt.sign(
-    { type: 'fill_batch', deviceIds, date: new Date().toISOString().slice(0, 10) },
+    { type: 'fill_batch', deviceIds, date: todayStr() },
     SECRET,
     { expiresIn: secondsUntilEndOfDay() }
   );

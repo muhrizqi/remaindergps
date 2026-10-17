@@ -159,3 +159,15 @@ Selain import dari Excel, kamu bisa tambah/edit customer langsung dari dashboard
   - Jam Diisi = jam saat itu juga
   Auto-isi ini hanya berlaku waktu **tambah baru**, tidak menimpa data yang
   sudah ada waktu **edit** customer.
+
+## Customer Berhenti Berlangganan
+
+- Di dashboard, tombol **Berhenti** pada baris customer menandainya nonaktif (bisa diberi catatan alasan, otomatis masuk Keterangan beserta tanggalnya).
+- Customer nonaktif **tidak ikut** pengingat isi pulsa, tagihan tahunan, link batch, maupun hitungan "semua sudah diisi". Tidak bisa ditandai Diisi/Bayar sampai diaktifkan kembali.
+- Datanya tetap tersimpan di tab **Berhenti Langganan**; tombol **Aktifkan Kembali** mengembalikannya. Status juga bisa diubah lewat form Edit.
+- No HP dan IMEI customer nonaktif tetap dihitung unik (tidak bisa dipakai customer lain).
+- Export Excel punya kolom **Status** (Aktif/Nonaktif). Saat import, kolom Status dibaca; kalau kolomnya tidak ada, status yang sudah ada tidak diubah.
+
+## Zona Waktu
+
+Tanggal "hari ini" dan jam diisi memakai `TIMEZONE` (default Asia/Jakarta), bukan zona waktu server. Kolom tanggal dikirim sebagai teks YYYY-MM-DD sehingga tidak bergeser antar zona waktu.

@@ -1,4 +1,68 @@
-const { pool } = require('./db');
+const { pool, SQL_NORM_PHONE } = require('./db');
+
+// Samakan format No HP supaya "0812-3456", "+62 812 3456", dan "628123456" dianggap sama.
+// Harus sama dengan SQL_NORM_PHONE di db.js.
+function normalizePhone(v) {
+  const digits = String(v == null ? '' : v).replace(/\D/g, '');
+  return digits.startsWith('62') ? '0' + digits.slice(2) : digits;
+}
+
+// IMEI kosong ('' atau spasi) dianggap tidak ada -> disimpan NULL, tidak ikut aturan unik
+function normalizeImei(v) {
+  if (v == null) return null;
+  const s = String(v).trim();
+  return s === '' ? null : s;
+}
+
+// Cari device LAIN (selain excludeId) yang sudah memakai No HP ini
+async function findPhoneConflict(noHp, excludeId = null) {
+  const norm = normalizePhone(noHp);
+  if (!norm) return null;
+  const { rows } = await pool.query(
+    `SELECT id, nama_account, device_name, status FROM devices
+     WHERE ${SQL_NORM_PHONE} = $1 AND ($2::int IS NULL OR id <> $2::int)
+     ORDER BY id LIMIT 1`,
+    [norm, excludeId]
+  );
+  return rows[0] || null;
+}
+
+// Cari device LAIN (selain excludeId) yang sudah memakai IMEI ini
+async function findImeiConflict(imei, excludeId = null) {
+  const val = normalizeImei(imei);
+  if (!val) return null;
+  const { rows } = await pool.query(
+    `SELECT id, nama_account, device_name, status FROM devices
+     WHERE imei = $1 AND ($2::int IS NULL OR id <> $2::int)
+     ORDER BY id LIMIT 1`,
+    [val, excludeId]
+  );
+  return rows[0] || null;
+}
+
+async function findDeviceByImei(imei) {
+  const val = normalizeImei(imei);
+  if (!val) return null;
+  const { rows } = await pool.query('SELECT * FROM devices WHERE imei = $1 LIMIT 1', [val]);
+  return rows[0] || null;
+}
+
+async function findDeviceByPhone(noHp) {
+  const norm = normalizePhone(noHp);
+  if (!norm) return null;
+  const { rows } = await pool.query(
+    `SELECT * FROM devices WHERE ${SQL_NORM_PHONE} = $1 ORDER BY id LIMIT 1`,
+    [norm]
+  );
+  return rows[0] || null;
+}
+
+// Teks pendek untuk pesan peringatan: "premio2 (Innova AB1540SM)"
+function describeDevice(d) {
+  const nama = d.nama_account || 'customer lain';
+  const extra = d.device_name ? ` (${d.device_name})` : '';
+  return `${nama}${extra}${d.status === 'nonactive' ? ' [nonaktif]' : ''}`;
+}
 
 const FILL_CYCLE_DAYS = parseInt(process.env.FILL_CYCLE_DAYS || '28', 10);
 const MAX_FILL_COUNT = parseInt(process.env.MAX_FILL_COUNT || '13', 10);
@@ -149,4 +213,11 @@ module.exports = {
   areAllFilledToday,
   tryClaimDailyEvent,
   getDevicesByIds,
+  normalizePhone,
+  normalizeImei,
+  findPhoneConflict,
+  findImeiConflict,
+  findDeviceByImei,
+  findDeviceByPhone,
+  describeDevice,
 };

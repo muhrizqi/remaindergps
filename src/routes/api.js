@@ -10,8 +10,45 @@ const {
   getDevicesDueForBillingToday,
   markFilled,
   markRenewalPaid,
+  normalizeImei,
+  findPhoneConflict,
+  findImeiConflict,
+  describeDevice,
 } = require('../deviceService');
 const { runDailyCheck } = require('../cron');
+
+// Cek No HP & IMEI terhadap device lain. Return null kalau aman, atau
+// { status: 409, field, error } kalau bentrok - dipakai bersama oleh tambah & edit.
+async function checkUniqueness({ noHp, imei }, excludeId = null) {
+  const imeiOwner = await findImeiConflict(imei, excludeId);
+  if (imeiOwner) {
+    return {
+      status: 409,
+      field: 'imei',
+      error: `IMEI ${normalizeImei(imei)} sudah dipakai ${describeDevice(imeiOwner)}. Satu IMEI hanya boleh untuk satu device.`,
+    };
+  }
+  const phoneOwner = await findPhoneConflict(noHp, excludeId);
+  if (phoneOwner) {
+    return {
+      status: 409,
+      field: 'no_hp',
+      error: `No HP ${String(noHp).trim()} sudah dipakai ${describeDevice(phoneOwner)}. Satu No HP hanya boleh untuk satu device.`,
+    };
+  }
+  return null;
+}
+
+// Terjemahkan error unique-constraint dari database (jaring pengaman kalau dua request
+// bentrok di waktu yang sama sehingga lolos dari pengecekan di atas)
+function uniqueViolationResponse(e) {
+  const isPhone = String(e.constraint || '').includes('no_hp');
+  return {
+    status: 409,
+    field: isPhone ? 'no_hp' : 'imei',
+    error: isPhone ? 'No HP ini sudah dipakai device lain.' : 'IMEI ini sudah dipakai device lain.',
+  };
+}
 const { importFromExcel } = require('../migrate-excel');
 
 const upload = multer({ dest: os.tmpdir() });
@@ -113,8 +150,34 @@ router.get('/export-excel', async (req, res) => {
 // (cadangan kalau auto-migrate saat startup gagal, tanpa perlu akses terminal)
 router.post('/run-schema-migration', async (req, res) => {
   const { ensureSchema } = require('../db');
-  await ensureSchema();
-  res.json({ ok: true, message: 'Schema database berhasil dijalankan/diperbarui.' });
+  const { warnings } = await ensureSchema();
+  res.json({
+    ok: true,
+    message:
+      'Schema database berhasil dijalankan/diperbarui.' +
+      (warnings.length ? '\n\n⚠️ ' + warnings.join('\n⚠️ ') : ''),
+  });
+});
+
+// Cek cepat apakah No HP / IMEI sudah dipakai device lain (dipanggil form saat kolom selesai diisi).
+// excludeId = id device yang sedang diedit, supaya tidak dianggap bentrok dengan dirinya sendiri.
+router.get('/check-unique', async (req, res) => {
+  const excludeId = req.query.excludeId ? parseInt(req.query.excludeId, 10) : null;
+  const result = { imei: null, no_hp: null };
+
+  if (req.query.imei) {
+    const owner = await findImeiConflict(req.query.imei, excludeId);
+    if (owner) {
+      result.imei = `IMEI ini sudah dipakai ${describeDevice(owner)}.`;
+    }
+  }
+  if (req.query.no_hp) {
+    const owner = await findPhoneConflict(req.query.no_hp, excludeId);
+    if (owner) {
+      result.no_hp = `No HP ini sudah dipakai ${describeDevice(owner)}.`;
+    }
+  }
+  res.json(result);
 });
 
 // List semua device
@@ -141,6 +204,12 @@ router.post('/devices', async (req, res) => {
     return res.status(400).json({ error: 'No HP wajib diisi.' });
   }
 
+  const imei = normalizeImei(b.imei);
+  const conflict = await checkUniqueness({ noHp: b.no_hp, imei });
+  if (conflict) {
+    return res.status(conflict.status).json({ error: conflict.error, field: conflict.field });
+  }
+
   try {
     const { rows } = await pool.query(
       `INSERT INTO devices
@@ -150,7 +219,7 @@ router.post('/devices', async (req, res) => {
        RETURNING *`,
       [
         b.nama_account.trim(), b.kontak_pemilik || null, b.device_name || null,
-        b.imei || null, b.no_hp.trim(), b.pertama_diisi || null,
+        imei, b.no_hp.trim(), b.pertama_diisi || null,
         b.bayar_1_tahun || null, b.setahun_saat || null, b.terakhir_diisi || null,
         b.jam_diisi || null, b.akan_habis || null, b.jumlah_diisi || 0, b.keterangan_json || {},
       ]
@@ -158,7 +227,8 @@ router.post('/devices', async (req, res) => {
     res.status(201).json(rows[0]);
   } catch (e) {
     if (e.code === '23505') {
-      return res.status(409).json({ error: 'IMEI ini sudah dipakai device lain.' });
+      const r = uniqueViolationResponse(e);
+      return res.status(r.status).json({ error: r.error, field: r.field });
     }
     throw e;
   }
@@ -172,27 +242,47 @@ const ALLOWED_DEVICE_FIELDS = new Set([
 ]);
 
 router.patch('/devices/:id', async (req, res) => {
-  const fields = Object.keys(req.body).filter((f) => ALLOWED_DEVICE_FIELDS.has(f));
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'ID tidak valid' });
+
+  const body = { ...req.body };
+  const fields = Object.keys(body).filter((f) => ALLOWED_DEVICE_FIELDS.has(f));
   if (fields.length === 0) return res.status(400).json({ error: 'Tidak ada field valid untuk diupdate' });
+
+  // Rapikan IMEI (kosong -> NULL) dan No HP (tidak boleh dikosongkan)
+  if ('imei' in body) body.imei = normalizeImei(body.imei);
+  if ('no_hp' in body) {
+    body.no_hp = String(body.no_hp == null ? '' : body.no_hp).trim();
+    if (!body.no_hp) return res.status(400).json({ error: 'No HP tidak boleh dikosongkan.' });
+  }
+
+  // Cek bentrok hanya untuk field yang memang sedang diubah, dan abaikan device ini sendiri
+  if ('imei' in body || 'no_hp' in body) {
+    const conflict = await checkUniqueness(
+      { noHp: 'no_hp' in body ? body.no_hp : null, imei: 'imei' in body ? body.imei : null },
+      id
+    );
+    if (conflict) {
+      return res.status(conflict.status).json({ error: conflict.error, field: conflict.field });
+    }
+  }
 
   // Normalisasi string kosong jadi NULL untuk kolom tanggal/waktu, supaya tidak error
   // "invalid input syntax" waktu form dikosongkan
-  const values = fields.map((f) => {
-    const v = req.body[f];
-    return v === '' ? null : v;
-  });
+  const values = fields.map((f) => (body[f] === '' ? null : body[f]));
   const setClause = fields.map((f, i) => `${f} = $${i + 2}`).join(', ');
 
   try {
     const { rows } = await pool.query(
       `UPDATE devices SET ${setClause}, updated_at = now() WHERE id = $1 RETURNING *`,
-      [req.params.id, ...values]
+      [id, ...values]
     );
     if (!rows[0]) return res.status(404).json({ error: 'Device tidak ditemukan' });
     res.json(rows[0]);
   } catch (e) {
     if (e.code === '23505') {
-      return res.status(409).json({ error: 'IMEI ini sudah dipakai device lain.' });
+      const r = uniqueViolationResponse(e);
+      return res.status(r.status).json({ error: r.error, field: r.field });
     }
     throw e;
   }

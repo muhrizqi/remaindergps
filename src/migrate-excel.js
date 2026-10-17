@@ -1,5 +1,12 @@
 const XLSX = require('xlsx');
 const { pool } = require('./db');
+const {
+  normalizeImei,
+  findDeviceByImei,
+  findDeviceByPhone,
+  findPhoneConflict,
+  describeDevice,
+} = require('./deviceService');
 
 function excelDateToISO(val) {
   if (!val) return null;
@@ -76,7 +83,7 @@ function parseKeterangan(val) {
  * Import data dari file Excel ke tabel devices.
  * @param {string} filePath - path file .xlsx di disk
  * @param {string|null} sheetName - nama sheet, default sheet pertama
- * @returns {Promise<{inserted:number, skipped:number, errors:string[], sheetNames:string[]}>}
+ * @returns {Promise<{inserted:number, updated:number, skipped:number, errors:string[], warnings:string[], sheetNames:string[]}>}
  */
 async function importFromExcel(filePath, sheetName = null) {
   const wb = XLSX.readFile(filePath, { cellDates: true });
@@ -97,10 +104,14 @@ async function importFromExcel(filePath, sheetName = null) {
   });
 
   let inserted = 0;
+  let updated = 0;
   let skipped = 0;
-  const errors = [];
+  const errors = [];   // baris yang DILEWATI (tidak masuk database)
+  const warnings = []; // baris yang masuk, tapi ada hal yang perlu admin tahu
+  const seenImei = new Map(); // imei -> label baris pertama, untuk mendeteksi baris kembar di file
 
-  for (const r of rows) {
+  for (let idx = 0; idx < rows.length; idx++) {
+    const r = rows[idx];
     const noHp = r['no hp'] || r['No HP'] || r['No Hp'];
     const namaAccount = r['nama account'] || r['Nama Account'];
     if (!noHp || !namaAccount) {
@@ -108,51 +119,79 @@ async function importFromExcel(filePath, sheetName = null) {
       continue;
     }
 
+    const rowLabel = `No ${r['No'] != null ? r['No'] : idx + 2}`;
+    const noHpStr = String(noHp).trim();
+    const imei = normalizeImei(r['imei'] || r['IMEI']);
+
     try {
-      await pool.query(
-        `INSERT INTO devices
-          (nama_account, kontak_pemilik, device_name, imei, no_hp,
-           pertama_diisi, bayar_1_tahun, setahun_saat, terakhir_diisi,
-           jam_diisi, akan_habis, jumlah_diisi, keterangan_json)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
-         ON CONFLICT (imei) DO UPDATE SET
-           nama_account = EXCLUDED.nama_account,
-           kontak_pemilik = EXCLUDED.kontak_pemilik,
-           device_name = EXCLUDED.device_name,
-           no_hp = EXCLUDED.no_hp,
-           pertama_diisi = EXCLUDED.pertama_diisi,
-           bayar_1_tahun = EXCLUDED.bayar_1_tahun,
-           setahun_saat = EXCLUDED.setahun_saat,
-           terakhir_diisi = EXCLUDED.terakhir_diisi,
-           jam_diisi = EXCLUDED.jam_diisi,
-           akan_habis = EXCLUDED.akan_habis,
-           jumlah_diisi = EXCLUDED.jumlah_diisi,
-           keterangan_json = EXCLUDED.keterangan_json,
-           updated_at = now()`,
-        [
-          namaAccount,
-          r['Kontak Pemilik'] || r['kontak pemilik'],
-          r['Device Name'] || r['device name'],
-          String(r['imei'] || r['IMEI'] || '').trim(),
-          String(noHp).trim(),
-          excelDateToISO(r['pertama diisi']),
-          excelDateToISO(r['Bayar 1 Tahun'] || r['bayar 1 tahun']),
-          excelDateToISO(r['setahun saat']),
-          excelDateToISO(r['terakhir diisi']),
-          excelTimeToStr(r['jam diisi']),
-          excelDateToISO(r['akan habis']),
-          parseInt(r['jumlah diisi'], 10) || 0,
-          JSON.stringify(parseKeterangan(r['Keterangan'] || r['keterangan'])),
-        ]
-      );
-      inserted++;
+      // Cocokkan dengan device yang sudah ada: lewat IMEI; kalau IMEI kosong, lewat No HP.
+      const existing = imei ? await findDeviceByImei(imei) : await findDeviceByPhone(noHpStr);
+
+      // No HP tidak boleh dipakai device LAIN (device yang sama boleh, itu berarti update)
+      const phoneOwner = await findPhoneConflict(noHpStr, existing ? existing.id : null);
+      if (phoneOwner) {
+        errors.push(
+          `${rowLabel} (${namaAccount}): No HP ${noHpStr} sudah dipakai ${describeDevice(phoneOwner)} - baris dilewati`
+        );
+        skipped++;
+        continue;
+      }
+
+      // Baris kembar di dalam file yang sama: yang terakhir menang (data terbaru), tapi diberi tahu
+      if (imei) {
+        if (seenImei.has(imei)) {
+          warnings.push(
+            `${rowLabel} (${namaAccount}): IMEI ${imei} sama dengan ${seenImei.get(imei)} - data baris sebelumnya ditimpa baris ini`
+          );
+        }
+        seenImei.set(imei, rowLabel);
+      }
+
+      const values = [
+        namaAccount,
+        r['Kontak Pemilik'] || r['kontak pemilik'] || null,
+        r['Device Name'] || r['device name'] || null,
+        imei,
+        noHpStr,
+        excelDateToISO(r['pertama diisi']),
+        excelDateToISO(r['Bayar 1 Tahun'] || r['bayar 1 tahun']),
+        excelDateToISO(r['setahun saat']),
+        excelDateToISO(r['terakhir diisi']),
+        excelTimeToStr(r['jam diisi']),
+        excelDateToISO(r['akan habis']),
+        parseInt(r['jumlah diisi'], 10) || 0,
+        JSON.stringify(parseKeterangan(r['Keterangan'] || r['keterangan'])),
+      ];
+
+      if (existing) {
+        await pool.query(
+          `UPDATE devices SET
+             nama_account = $1, kontak_pemilik = $2, device_name = $3, imei = $4, no_hp = $5,
+             pertama_diisi = $6, bayar_1_tahun = $7, setahun_saat = $8, terakhir_diisi = $9,
+             jam_diisi = $10, akan_habis = $11, jumlah_diisi = $12, keterangan_json = $13,
+             updated_at = now()
+           WHERE id = $14`,
+          [...values, existing.id]
+        );
+        updated++;
+      } else {
+        await pool.query(
+          `INSERT INTO devices
+            (nama_account, kontak_pemilik, device_name, imei, no_hp,
+             pertama_diisi, bayar_1_tahun, setahun_saat, terakhir_diisi,
+             jam_diisi, akan_habis, jumlah_diisi, keterangan_json)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+          values
+        );
+        inserted++;
+      }
     } catch (e) {
-      errors.push(`${namaAccount}: ${e.message}`);
+      errors.push(`${rowLabel} (${namaAccount}): ${e.message}`);
       skipped++;
     }
   }
 
-  return { inserted, skipped, errors, sheetNames: wb.SheetNames };
+  return { inserted, updated, skipped, errors, warnings, sheetNames: wb.SheetNames };
 }
 
 module.exports = { importFromExcel };
@@ -168,8 +207,9 @@ if (require.main === module) {
   }
   importFromExcel(filePath, sheetName)
     .then((r) => {
-      console.log(`Selesai. Berhasil: ${r.inserted}, dilewati: ${r.skipped}`);
-      if (r.errors.length) console.log('Errors:', r.errors);
+      console.log(`Selesai. Baru: ${r.inserted}, diperbarui: ${r.updated}, dilewati: ${r.skipped}`);
+      if (r.warnings.length) console.log('Peringatan:', r.warnings);
+      if (r.errors.length) console.log('Dilewati:', r.errors);
       process.exit(0);
     })
     .catch((e) => {

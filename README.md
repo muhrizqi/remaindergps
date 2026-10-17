@@ -137,6 +137,20 @@ Selain import dari Excel, kamu bisa tambah/edit customer langsung dari dashboard
 - Validasi otomatis: Nama Account & No HP wajib diisi, dan kalau IMEI yang
   dimasukkan sudah dipakai device lain, sistem akan menolak dengan pesan
   yang jelas (bukan error teknis).
+- **No HP dan IMEI harus unik**: tidak boleh ada dua customer dengan No HP (SIM GPS)
+  atau IMEI yang sama, baik saat tambah, edit, maupun import Excel.
+  - Penulisan nomor tidak berpengaruh: `0812-3456-789`, `+62 812 3456 789`, dan
+    `628123456789` dianggap nomor yang sama.
+  - Di form, peringatan merah muncul di bawah kolom begitu selesai diisi dan menyebut
+    siapa pemilik data tersebut. Tombol Simpan ditolak selama masih bentrok.
+  - IMEI boleh kosong (beberapa device memang tanpa IMEI), kosong tidak dihitung kembar.
+  - Saat import Excel: baris yang No HP-nya dipakai customer lain dilewati dan dilaporkan;
+    baris yang IMEI-nya kembar di dalam file yang sama dilaporkan sebagai "Perhatian"
+    (baris terakhir yang dipakai). Baris tanpa IMEI dicocokkan lewat No HP.
+  - Selain validasi di aplikasi, database juga punya unique index sebagai pengaman terakhir.
+    Kalau data lama kamu ternyata sudah ada No HP kembar, index itu belum bisa dibuat dan
+    tombol **Perbaiki Database** akan menampilkan nomor mana yang kembar. Aplikasi tetap
+    jalan normal sambil kamu merapikan datanya lewat tombol Edit.
 - **Auto-isi saat tambah customer baru**: begitu kamu isi tanggal "Bayar 1
   Tahun", field lain otomatis terisi mengikuti:
   - Setahun Saat (jatuh tempo) = Bayar 1 Tahun + 1 tahun
